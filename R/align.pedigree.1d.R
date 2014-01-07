@@ -160,7 +160,7 @@ align.pedigree.1d.compactsubtree <- function(pos, n, nid, fam, spouse, ped) {
 }
 
 #' Insert person(s) at the rightmost position of a given level
-#' 
+#'
 #' @param pos
 #'     integer matrix, pos element
 #' @param i
@@ -178,7 +178,7 @@ pedpos.insert.right <- function(pos, i, js) {
 }
 
 #' Insert an extended sibship flanking their parents
-#' 
+#'
 #' @param pos
 #'     integer matrix, pos element
 #' @param i
