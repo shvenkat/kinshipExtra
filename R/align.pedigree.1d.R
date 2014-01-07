@@ -129,13 +129,15 @@ align.pedigree.1d.compactsubtree <- function(pos, n, nid, fam, spouse, ped) {
                 k <- k + 1
 
             jmid <- sibs[ceiling((length(sibs) - 1)/2)]
-            while(spouse[i, jmid] != 0)
-                jmid <- jmid + 1
-            lxsibs <- j:jmid
-            if(jmid < k)
+            if(length(jmid) == 0) {
+                lxsibs <- integer(0)
+                rxsibs <- j:k
+            } else {
+                while(spouse[i, jmid] != 0)
+                    jmid <- jmid + 1
+                lxsibs <- j:jmid
                 rxsibs <- ((jmid + 1):k)
-            else
-                rxsibs <- integer(0)
+            }
 
             dad <- which(nid[i - 1, ] == ped$findex[nid[i, min(sibs)]])
             mom <- which(nid[i - 1, ] == ped$mindex[nid[i, min(sibs)]])
