@@ -125,11 +125,11 @@ align.pedigree.1d.compactsubtree <- function(pos, n, nid, fam, spouse, ped) {
                             "= (%i, %i)"),
                         i, j))
             k <- max(sibs)
-            while(spouse[i, k] != 0 && fam[i, k + 1] == 0)
+            while(spouse[i, k] != 0)
                 k <- k + 1
 
             jmid <- sibs[ceiling((length(sibs) - 1)/2)]
-            while(spouse[i, jmid] != 0 && fam[i, jmid + 1] == 0)
+            while(spouse[i, jmid] != 0)
                 jmid <- jmid + 1
             lxsibs <- j:jmid
             if(jmid < k)
