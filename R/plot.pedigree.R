@@ -1,15 +1,15 @@
 # Automatically generated from all.nw using noweb
-plot.pedigree <- function(x, id = x$id, status = x$status, 
-                          affected = x$affected, 
+plot.pedigree <- function(x, id = x$id, status = x$status,
+                          affected = x$affected,
                           cex = 1, col = 1,
-                          symbolsize = 1, branch = 0.6, 
-                          packed = TRUE, align = c(1.5,2), width = 8, 
+                          symbolsize = 1, branch = 0.6,
+                          packed = TRUE, align = c(1.5,2), width = 8,
                           density=c(-1, 35,55,25), mar=c(4.1, 1, 4.1, 1),
                           angle=c(90,65,40,0), keep.par=FALSE,
                           subregion, align.result, ...)
 {
     Call <- match.call()
-    n <- length(x$id)        
+    n <- length(x$id)
     if(is.null(status))
       status <- rep(0, n)
     else {
@@ -31,7 +31,7 @@ plot.pedigree <- function(x, id = x$id, status = x$status,
             if (is.logical(affected)) affected <- 1* affected
             if (ncol(affected) > length(angle) || ncol(affected) > length(density))
                 stop("More columns in the affected matrix than angle/density values")
-            } 
+            }
         else {
             if (length(affected) != n)
                 stop("Wrong length for affected")
@@ -52,21 +52,21 @@ plot.pedigree <- function(x, id = x$id, status = x$status,
     if (length(col) ==1) col <- rep(col, n)
     else if (length(col) != n) stop("Col argument must be of length 1 or n")
     subregion2 <- function(plist, subreg) {
-        if (subreg[3] <1 || subreg[4] > length(plist$n)) 
+        if (subreg[3] <1 || subreg[4] > length(plist$n))
             stop("Invalid depth indices in subreg")
         lkeep <- subreg[3]:subreg[4]
         for (i in lkeep) {
             if (!any(plist$pos[i,]>=subreg[1] & plist$pos[i,] <= subreg[2]))
                 stop(paste("No subjects retained on level", i))
             }
-        
+
         nid2 <- plist$nid[lkeep,]
         n2   <- plist$n[lkeep]
         pos2 <- plist$pos[lkeep,]
         spouse2 <- plist$spouse[lkeep,]
         fam2 <- plist$fam[lkeep,]
         if (!is.null(plist$twins)) twin2 <- plist$twins[lkeep,]
-        
+
         for (i in 1:nrow(nid2)) {
             keep <- which(pos2[i,] >=subreg[1] & pos2[i,] <= subreg[2])
             nkeep <- length(keep)
@@ -80,11 +80,11 @@ plot.pedigree <- function(x, id = x$id, status = x$status,
             if (i < nrow(nid2)) {  #look ahead
                 tfam <- match(fam2[i+1,], keep, nomatch=0)
                 fam2[i+1,] <- tfam
-                if (any(spouse2[i,tfam] ==0)) 
+                if (any(spouse2[i,tfam] ==0))
                     stop("A subregion cannot separate parents")
                 }
             }
-        
+
         n <- max(n2)
         out <- list(n= n2[1:n], nid=nid2[,1:n, drop=F], pos=pos2[,1:n, drop=F],
                     spouse= spouse2[,1:n, drop=F], fam=fam2[,1:n, drop=F])
@@ -117,11 +117,11 @@ plot.pedigree <- function(x, id = x$id, status = x$status,
     boxh  <- boxsize/vscale   # box height in user units
     labh  <- stemp2/vscale   # height of a text string
     legh  <- min(1/4, boxh  *1.5)  # how tall are the 'legs' up from a child
-    par(usr=c(xrange[1]- boxw/2, xrange[2]+ boxw/2, 
+    par(usr=c(xrange[1]- boxw/2, xrange[2]+ boxw/2,
               maxlev+ boxh+ stemp3 + stemp2/2 , 1))
     circfun <- function(nslice, n=50) {
         nseg <- ceiling(n/nslice)  #segments of arc per slice
-        
+
         theta <- -pi/2 - seq(0, 2*pi, length=nslice +1)
         out <- vector('list', nslice)
         for (i in 1:nslice) {
@@ -167,7 +167,7 @@ plot.pedigree <- function(x, id = x$id, status = x$status,
             out[[i]] <- list(x=c(0, temp$x[rows]), y= c(0, temp$y[rows]) +.5)
             }
         out
-        }   
+        }
     if (ncol(affected)==1) {
         polylist <- list(
             square = list(list(x=c(-1, -1, 1,1)/2,  y=c(0, 1, 1, 0))),
@@ -185,7 +185,7 @@ plot.pedigree <- function(x, id = x$id, status = x$status,
                                     theta= -(1:4) *pi/2))
         triangle <- polyfun(nc, list(x=c(-.56, .0, .56), y=c(-.5, .5, -.5),
                                      theta=c(-2, -4, -6) *pi/3))
-        polylist <- list(square=square, circle=circle, diamond=diamond, 
+        polylist <- list(square=square, circle=circle, diamond=diamond,
                          triangle=triangle)
         }
 
@@ -197,26 +197,26 @@ plot.pedigree <- function(x, id = x$id, status = x$status,
                             y + (polylist[[sex]])[[i]]$y *boxh,
                             col=NA, border=col)
                     }
-                
+
                 if(affected[i]==1) {
                   ## else {
                   polygon(x + (polylist[[sex]])[[i]]$x * boxw,
                           y + (polylist[[sex]])[[i]]$y * boxh,
-                          col=col, border=col, density=density[i], angle=angle[i])            
+                          col=col, border=col, density=density[i], angle=angle[i])
                 }
                 if(affected[i] == -1) {
                   polygon(x + (polylist[[sex]])[[i]]$x * boxw,
                           y + (polylist[[sex]])[[i]]$y * boxh,
                           col=NA, border=col)
-                  
+
                   midx <- x + mean(range(polylist[[sex]][[i]]$x*boxw))
                   midy <- y + mean(range(polylist[[sex]][[i]]$y*boxh))
-                 
+
                   points(midx, midy, pch="?", cex=min(1, cex*2/length(affected)))
                 }
-                
+
               }
-            if (status==1) segments(x- .6*boxw, y+1.1*boxh, 
+            if (status==1) segments(x- .6*boxw, y+1.1*boxh,
                                     x+ .6*boxw, y- .1*boxh,)
             ## Do a black slash per Beth, old line was
             ##        x+ .6*boxw, y- .1*boxh, col=col)
@@ -238,13 +238,13 @@ plot.pedigree <- function(x, id = x$id, status = x$status,
         tempy <- i + boxh/2
         if(any(plist$spouse[i,  ]>0)) {
             temp <- (1:maxcol)[plist$spouse[i,  ]>0]
-            segments(plist$pos[i, temp] + boxw/2, rep(tempy, length(temp)), 
+            segments(plist$pos[i, temp] + boxw/2, rep(tempy, length(temp)),
                      plist$pos[i, temp + 1] - boxw/2, rep(tempy, length(temp)))
 
             temp <- (1:maxcol)[plist$spouse[i,  ] ==2]
             if (length(temp)) { #double line for double marriage
                 tempy <- tempy + boxh/10
-                segments(plist$pos[i, temp] + boxw/2, rep(tempy, length(temp)), 
+                segments(plist$pos[i, temp] + boxw/2, rep(tempy, length(temp)),
                        plist$pos[i, temp + 1] - boxw/2, rep(tempy, length(temp)))
                 }
         }
@@ -252,7 +252,7 @@ plot.pedigree <- function(x, id = x$id, status = x$status,
     for(i in 2:maxlev) {
         zed <- unique(plist$fam[i,  ])
         zed <- zed[zed > 0]  #list of family ids
-        
+
         for(fam in zed) {
             xx <- plist$pos[i - 1, fam + 0:1]
             parentx <- mean(xx)   #midpoint of parents
@@ -271,7 +271,7 @@ plot.pedigree <- function(x, id = x$id, status = x$status,
                 }
             yy <- rep(i, sum(who))
             segments(plist$pos[i,who], yy, target, yy-legh)
-                      
+
             ## draw midpoint MZ twin line
             if (any(plist$twins[i,who] ==1)) {
               who2 <- which(plist$twins[i,who] ==1)
@@ -289,8 +289,8 @@ plot.pedigree <- function(x, id = x$id, status = x$status,
                 yy <- rep(i, length(who2)) - legh/2
                 text((temp1+temp2)/2, yy, '?')
                 }
-            
-            # Add the horizontal line 
+
+            # Add the horizontal line
             segments(min(target), i-legh, max(target), i-legh)
 
             # Draw line to parents
@@ -302,7 +302,7 @@ plot.pedigree <- function(x, id = x$id, status = x$status,
                 y2 <- (i-1) + boxh/2
                 x2 <- parentx
                 ydelta <- ((y2 - y1) * branch)/2
-                segments(c(x1, x1, x2), c(y1, y1 + ydelta, y2 - ydelta), 
+                segments(c(x1, x1, x2), c(y1, y1 + ydelta, y2 - ydelta),
                          c(x1, x2, x2), c(y1 + ydelta, y2 - ydelta, y2))
                 }
             }
@@ -326,10 +326,10 @@ plot.pedigree <- function(x, id = x$id, status = x$status,
         }
     ckall <- x$id[is.na(match(x$id,x$id[plist$nid]))]
     if(length(ckall>0)) cat('Did not plot the following people:',ckall,'\n')
-        
+
     if(!keep.par) par(oldpar)
 
     tmp <- match(1:length(x$id), plist$nid)
     invisible(list(plist=plist, x=plist$pos[tmp], y= row(plist$pos)[tmp],
-                   boxw=boxw, boxh=boxh, call=Call))        
+                   boxw=boxw, boxh=boxh, call=Call))
     }
