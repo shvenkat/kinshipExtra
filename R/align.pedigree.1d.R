@@ -159,6 +159,16 @@ align.pedigree.1d.compactsubtree <- function(pos, n, nid, fam, spouse, ped) {
     return(pos)
 }
 
+#' Insert person(s) at the rightmost position of a given level
+#' 
+#' @param pos
+#'     integer matrix, pos element
+#' @param i
+#'     pedigree level, row of pos
+#' @param js
+#'     person(s) to insert, col(s) of pos
+#' @return
+#'     updated pos matrix
 pedpos.insert.right <- function(pos, i, js) {
     nj <- length(js)
     m <- max(pos[i, ], na.rm = TRUE)
@@ -167,6 +177,23 @@ pedpos.insert.right <- function(pos, i, js) {
     return(pos)
 }
 
+#' Insert an extended sibship flanking their parents
+#' 
+#' @param pos
+#'     integer matrix, pos element
+#' @param i
+#'     pedigree level, row of pos into which to insert the extended sibship
+#' @param lxsibs
+#'     subset of extended sibship to be inserted to the left of parents, col(s)
+#'     of pos
+#' @param rxsibs
+#'     subset of extended sibship to be inserted to the right of parents, col(s)
+#'     of pos
+#' @param dad
+#' @param mom
+#'     parents on level i - 1, col(s) of pos
+#' @return
+#'     updated pos matrix
 pedpos.insert.flanking <- function(pos, i, lxsibs, rxsibs, dad, mom) {
     lparent <- min(dad, mom)
     rparent <- max(dad, mom)
