@@ -8,15 +8,15 @@
 #'
 #' @param ped
 #'     pedigree object, as returned by kinship2::pedigree
+#' @param method
+#'     string, one of 'compactsubtree' and 'preserveorder'
 #' @param ...
 #'     additional arguments passed to kinship2::align.pedigree
 #' @return
 #'     list, as returned by kinship2::align.pedigree
 #' @import kinship2
 #' @export
-align.pedigree.1d <- function(ped,
-        method = c("compactsubtree", "preserveorder"),
-        ...) {
+align.pedigree.1d <- function(ped, method = "compactsubtree", ...) {
 
     align.result <- align.pedigree(ped, ...)
     pedheight <- length(align.result$n)
@@ -30,12 +30,12 @@ align.pedigree.1d <- function(ped,
     pos <- align.result$pos
 
     pos[nid == 0] <- NA
-    method <- match.arg(method)
+    method <- match.arg(method, c("compactsubtree", "preserveorder"))
     pos <- switch(method,
         "compactsubtree" = align.pedigree.1d.compactsubtree(pos, n, nid, fam,
             spouse, ped),
         "preserveorder" = align.pedigree.1d.preserveorder(pos),
-        stop(sprintf("%s is not a valid method argument to %s", method,
+        stop(sprintf("%s is not a valid 'method' argument to %s", method,
                 match.call()[[1]])))
     if(any(pos[!is.na(pos)] == 0))
         warning("Some persons were not assigned positions, defaulting to zero")
