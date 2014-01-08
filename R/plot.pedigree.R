@@ -8,6 +8,7 @@ plot.pedigree <- function(x, id = x$id, status = x$status,
                           angle=c(90,65,40,0), keep.par=FALSE,
                           subregion, align.result, ...)
 {
+    # Checks
     Call <- match.call()
     n <- length(x$id)
     if(is.null(status))
@@ -49,6 +50,7 @@ plot.pedigree <- function(x, id = x$id, status = x$status,
                 stop("Invalid code for affected status")
     }
 
+    # Subset pedigree if needed
     if (length(col) ==1) col <- rep(col, n)
     else if (length(col) != n) stop("Col argument must be of length 1 or n")
     subregion2 <- function(plist, subreg) {
@@ -98,6 +100,7 @@ plot.pedigree <- function(x, id = x$id, status = x$status,
     if (!missing(subregion)) plist <- subregion2(plist, subregion)
     xrange <- range(plist$pos[plist$nid >0])
     maxlev <- nrow(plist$pos)
+    # Initialize plot
     frame()
     oldpar <- par(mar=mar, xpd=TRUE)
     psize <- par('pin')  # plot region in inches
