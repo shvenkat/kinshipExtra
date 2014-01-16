@@ -35,8 +35,7 @@ align.pedigree.1d <- function(ped, method = "compactsubtree", ...) {
         "compactsubtree" = align.pedigree.1d.compactsubtree(pos, n, nid, fam,
             spouse, ped),
         "preserveorder" = align.pedigree.1d.preserveorder(pos),
-        stop(sprintf("%s is not a valid 'method' argument to %s", method,
-                match.call()[[1]])))
+        stop(sprintf("%s is not a valid 'method'", method)))
     if(any(pos[!is.na(pos)] == 0))
         warning("Some persons were not assigned positions, defaulting to zero")
     pos[is.na(pos)] <- 0
