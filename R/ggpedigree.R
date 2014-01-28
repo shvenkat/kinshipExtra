@@ -21,7 +21,7 @@
 #' @param symbolalpha
 #'      (Optional) Factors or numeric vectors specifying the values of
 #'      qualitative or quantitative traits (or other variables) respectively.
-#'      Must correspond to ped$id in order of values and length. Used to
+#'      Must correspond to ped$id in length and order of values. Used to
 #'      annotate the corresponding pedigree symbols using the fill color,
 #'      border color, size and transparency attributes. Logical, integer or
 #'      character vectors can also be used, and will be coerced into factors
@@ -36,14 +36,15 @@
 #'      attribute values. For factor variables, provide attribute values for
 #'      the corresponding factor levels. For numeric variables, specify the
 #'      high and low attribute values. Default values are provided, except for
-#'      factors more than 3 levels.
+#'      factors with more than 3 levels.
 #' @param labelsize
 #'      (Optional) Label size multiplier, default 1.  Use 0 to avoid labeling symbols.
 #' @return
 #'      ggplot object, including legend.
 #' @section Details:
-#'      By convention, fill color is used to indicate affection status (for the
-#'      primary trait, if there are multiple).
+#'      By convention, shape is used to indicate sex. Fill color is typically
+#'      used to indicate affection status (for the primary trait, if there are
+#'      multiple).
 #'
 #'      For qualitative/categorical variables as symbol{fill,border,size,alpha} arguments, factors are
 #'      recommended over logical, integer and character vectors for two
@@ -81,32 +82,34 @@ ggpedigree <- function(ped,
         symbolborder = NULL,
         symbolsize   = NULL,
         symbolalpha  = NULL,
-        fillvalues   = c("white", "gray25", "green"),
-        bordervalues = c("black", "red", "cyan"),
-        sizevalues   = c(7.5, 10, 5),
-        alphavalues  = c(1, 0.3, 0.6),
+        fillvalues,
+        bordervalues,
+        sizevalues,
+        alphavalues,
         labelsize    = 1) {
 
-    # Error and warning message setup
-    msgPrefix <- as.character(match.call()[[1]])
+    # # Error and warning message setup
+    # msgPrefix <- as.character(match.call()[[1]])
 
-    # UNPACK, CHECK AND CONVERT ARGUMENTS
+    # CHECK AND CONVERT ARGUMENTS #############################################
 
-    id <- ped$id
-    sex <- ped$sex
-    status <- ped$status
+    # Pedigree argument
+    id       <- ped$id
+    sex      <- ped$sex
+    status   <- ped$status
     affected <- ped$affected
 
-    nid <- pedalign$nid
+    # Pedigree alignment argument should match pedigree
+    nid    <- pedalign$nid
     if(!setequal(seq_along(id), nid[nid != 0]))
         stop("'pedalign' does not match 'ped'")
-    n <- pedalign$n
-    fam <- pedalign$fam
+    n      <- pedalign$n
+    fam    <- pedalign$fam
     spouse <- pedalign$spouse
-    pos <- pedalign$pos
+    pos    <- pedalign$pos
 
-    # Assign a default value to symbolfill if needed
-    if(missing(symbolfill))
+    # symbolfill argument: assign a default value using ped$affected
+    if(missing(symbolfill)) {
         if(is.null(affected))
             symbolfill <- NULL
         else {
@@ -118,36 +121,14 @@ ggpedigree <- function(ped,
             symbolfill <- factor(traitValues[symbolfill + 1],
                     levels = traitValues)
         }
-    # Check symbol{fill,border,size,alpha}, convert to factor if needed
-    convertSymbolAttrToFactor <- function(symbolattrname) {
-        symbolattr <- get(symbolattrname)
-        if(is.null(symbolattr))
-            return(NULL)
-        if(!is.factor(symbolattr) && !is.logical(symbolattr)
-            && !is.integer(symbolattr) && !is.character(symbolattr))
-            stop(sprintf(paste("%s: %s must be a vector of type factor,",
-                        "logical, integer or character"),
-                    msgPrefix, symbolattrname))
-        if(length(symbolattr) != length(id))
-            stop(sprintf("%s: %s has length that does not match 'ped'",
-                    msgPrefix, symbolattrname))
-        # if(any(is.na(symbolattr)))
-        #     stop(sprintf("%s: %s has NA(s), not allowed",
-        #             msgPrefix, symbolattrname))
-        if(is.factor(symbolattr))
-            result <- symbolattr
-        else
-            result <- factor(symbolattr)
-        # if(nlevels(result) > 2)
-        #     stop(sprintf("%s: %s has more than 2 unique values, not allowed",
-        #             msgPrefix, symbolattrname))
-        return(result)
     }
-    symbolattrs <- list("fill" = "symbolfill", "color" = "symbolborder",
-        "size" = "symbolsize", "alpha" = "symbolalpha")
-    symbolattrs <- lapply(symbolattrs, convertSymbolAttrToFactor)
-    # Only keep the non-null symbolattrs
-    symbolattrs <- symbolattrs[!sapply(symbolattrs, is.null)]
+    # Gather symbol attribute arguments
+    symbolattrs <- list("shape" = sex, "fill" = symbolfill,
+        "border" = symbolborder, "size" = symbolsize, "alpha" = symbolalpha)
+    # Assign single level "mock" default values to replace NULLs
+    symbolattrs <- lapply(symbolattrs, defaultSymbolAttr)
+    # Validate symbol{fill,border,size,alpha}
+    symbolattrs <- lapply(symbolattrs, validSymbolAttr)
 
     if(!is.numeric(labelsize) || length(labelsize) != 1 || !is.finite(labelsize)
         || labelsize < 0)
@@ -223,3 +204,32 @@ ggpedigree <- function(ped,
 
     return(plt)
 }
+
+        # if(is.null(symbolattr))
+        #     symbolattr <- switch(symbolattrname,
+        #         "symbolfill" = factor
+
+validSymbolAttr <- function(symbolattrname) {
+    symbolattr <- get(symbolattrname)
+    symbolattr <- switch(class(symbolattr),
+        "factor" = symbolattr,
+        "numeric" = symbolattr,
+        "character" = factor(symbolattr),
+        "logical" = factor(symbolattr),
+        "integer" = factor(symbolattr),
+        stop(sprintf(paste("%s: %s must be a vector of type factor or,",
+                    "numeric (or character, logical or integer)"),
+                msgPrefix, symbolattrname)))
+    if(length(symbolattr) != length(id))
+        stop(sprintf("%s: %s has length that does not match 'ped'",
+                msgPrefix, symbolattrname))
+    # if(any(is.na(symbolattr)))
+    #     stop(sprintf("%s: %s has NA(s), not allowed",
+    #             msgPrefix, symbolattrname))
+    return(symbolattr)
+}
+
+        # fillvalues   = c("white", "gray25", "green"),
+        # bordervalues = c("black", "red", "cyan"),
+        # sizevalues   = c(7.5, 10, 5),
+        # alphavalues  = c(1, 0.3, 0.6),
