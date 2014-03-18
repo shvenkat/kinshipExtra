@@ -33,10 +33,10 @@
 #' @param sizevalues
 #' @param alphavalues
 #'      (Optional) Named vectors used to map trait or variable values to symbol
-#'      attribute values. For factor variables, provide attribute values for
-#'      the corresponding factor levels. For numeric variables, specify the
-#'      high and low attribute values. Default values are provided, except for
-#'      factors with more than 3 levels.
+#'      attribute values. Specify the high and
+#'      low attribute values. Alternatively, for factor variables, provide
+#'      attribute values for the corresponding factor levels. Default values
+#'      are provided, except for factors with more than 3 levels.
 #' @param labelsize
 #'      (Optional) Label size multiplier, default 1.  Use 0 to avoid labeling symbols.
 #' @return
@@ -88,9 +88,6 @@ ggpedigree <- function(ped,
         alphavalues,
         labelsize    = 1) {
 
-    # # Error and warning message setup
-    # msgPrefix <- as.character(match.call()[[1]])
-
     # CHECK AND CONVERT ARGUMENTS #############################################
 
     # Pedigree argument
@@ -108,7 +105,7 @@ ggpedigree <- function(ped,
     spouse <- pedalign$spouse
     pos    <- pedalign$pos
 
-    # symbolfill argument: assign a default value using ped$affected
+    # If needed, assign a default value to symbolfill using ped$affected
     if(missing(symbolfill)) {
         if(is.null(affected))
             symbolfill <- NULL
@@ -122,10 +119,13 @@ ggpedigree <- function(ped,
                     levels = traitValues)
         }
     }
-    # Gather symbol attribute arguments
-    symbolattrs <- list("shape" = sex, "fill" = symbolfill,
+    # Gather symbol attributes
+    symbolAttrs <- list("shape" = sex, "fill" = symbolfill,
         "border" = symbolborder, "size" = symbolsize, "alpha" = symbolalpha)
-    # Assign single level "mock" default values to replace NULLs
+    # Hide legend key for unused (NULL-valued) symbol attributes
+    showAttrKeys <- lapply(symbolAttrs,
+        function(e) ifelse(is.null(e), FALSE, TRUE))
+    # Assign "mock" default values to unused (NULL-valued) symbol attributes
     symbolattrs <- lapply(symbolattrs, defaultSymbolAttr)
     # Validate symbol{fill,border,size,alpha}
     symbolattrs <- lapply(symbolattrs, validSymbolAttr)
