@@ -34,9 +34,9 @@
 #' @param alphavalues
 #'      (Optional) Named vectors used to map trait or variable values to symbol
 #'      attribute values. For factor variables, provide attribute values for
-#'      the corresponding factor levels. Alternatively, for factor and numeric
-#'      variables, specify the high and low attribute values. Default values
-#'      are provided, except for factors with more than 3 levels.
+#'      the corresponding factor levels. For numeric variables, specify the
+#'      high and low attribute values. Default values are provided, except for
+#'      factors with more than 3 levels.
 #' @param labelsize
 #'      (Optional) Label size multiplier, default 1.  Use 0 to avoid labeling symbols.
 #' @return
@@ -96,25 +96,12 @@ ggpedigree <- function(ped,
         alphavalues  = NULL,
         labelsize    = 1) {
 
-    # CHECK AND CONVERT ARGUMENTS #############################################
-
-    # Pedigree
-    id       <- ped$id
-    sex      <- ped$sex
-    status   <- ped$status
-    affected <- ped$affected
+    # CHECK ARGUMENTS #########################################################
 
     # Pedigree alignment should match pedigree
-    nid    <- pedalign$nid
-    if(!setequal(seq_along(id), nid[nid != 0]))
+    if(!setequal(seq_along(ped$id), pedalign$nid[pedalign$nid != 0]))
         stop("'pedalign' does not match 'ped'")
-    n      <- pedalign$n
-    fam    <- pedalign$fam
-    spouse <- pedalign$spouse
-    pos    <- pedalign$pos
 
-    # Symbol attributes
-    symbolshape <- sex
     # If appropriate, assign a default value to symbolfill using ped$affected
     if(missing(symbolfill)) {
         if(is.null(affected))
@@ -129,43 +116,25 @@ ggpedigree <- function(ped,
                     levels = traitValues)
         }
     }
-    # Gather symbol attributes
     symbolAttrs <- list(
-        "shape"  = symbolshape,
+        "shape"  = ped$sex,
         "fill"   = symbolfill,
         "border" = symbolborder,
         "size"   = symbolsize,
         "alpha"  = symbolalpha)
     # Hide legend key for unused (NULL-valued) symbol attributes
-    showAttrKeys <- lapply(symbolAttrs, function(x)
-        ifelse(is.null(x), FALSE, TRUE))
-    # Assign "mock" default values to unused (NULL-valued) symbol attributes
-    symbolAttrs <- lapply(names(symbolAttrs), function(x) {
-        ifelse(is.null(symbolAttrs[[x]]),
-            defaultSymbolAttr(name = x, n = length(id)),
-            symbolAttrs[[x]])
-        })
-    # Validate symbol{fill,border,size,alpha}
-    symbolAttrs <- lapply(names(symbolAttrs), function(x) {
-        validSymbolAttr(symbolAttr = symbolAttrs[[x]], n = length(id), name = x)
-        })
+    symbolAttrWasNull <- lapply(symbolAttrs, is.null)
+    symbolAttrs <- validSymbolAttrs(symbolAttrs, length(ped$id))
 
-    # Attribute value arguments
-    shapevalues <- as.integer(c("male" = 1, "female" = 2, "unknown" = 3,
-            "terminated" = 4))
     attrValues <- list(
-        "shape"  = shapevalues,
+        "shape"  = as.integer(c("male" = 1, "female" = 2, "unknown" = 3,
+                    "terminated" = 4)),
         "fill"   = fillvalues,
         "border" = bordervalues,
         "size"   = sizevalues,
         "alpha"  = alphavalues)
-
-    # Transform symbol attributes
-    symbolAttrs <- within(symbolAttrs, {
-        shape <- attrValues$shape[as.character(shape)]
-        fill  <- fill
-        size  <- NULL
-    })
+    attrValueWasNull <- lapply(attrValues, is.null)
+    attrValues <- validAttrValues(attrValues, symbolAttrs, symbolAttrWasNull)
 
     if(!is.numeric(labelsize) || length(labelsize) != 1 || !is.finite(labelsize)
         || labelsize < 0)
@@ -173,23 +142,14 @@ ggpedigree <- function(ped,
 
     # GENERATE PLOTTING DATA ##################################################
 
-    # Generate plotting data from ped and pedalign
-    # Values in pos give horizontal position, row number of pos gives vertical
-    xpos <- pos
-    ypos <- matrix(rep(1:nrow(nid), ncol(nid)), nrow = nrow(nid), byrow = FALSE)
-    # xpos and ypos are matrices corresponding to the 2d layout of the pedigree
-    # Extract a vector; subset and order it so xpos, ypos correspond to id
-    posSubset <- as.vector(nid) != 0
-    posOrder <- order(nid[posSubset])
-    xpos <- pos[posSubset][posOrder]
-    ypos <- ypos[posSubset][posOrder]
-    # Sanity check that data elements have same length
-    if(length(id) != length(xpos) || length(id) != length(ypos))
-        stop("Internal error: xpos and/or ypos do not match id in length")
-    # Build ggplot data
-    symbolData <- do.call(data.frame, c(list(id = id, x = xpos, y = ypos,
-                shape = sex), symbolAttrs))
-    symbolAttrMapping <- aes_all(c("x", "y", "shape", names(symbolAttrs)))
+    # Special handling of shape and size is needed due to the non-uniform
+    # apparent size of the standard plotting symbol shapes
+    symbolAttrs <- within(symbolAttrs, {
+        shape  <- attrValues$shape[as.character(shape)]
+        size   <- ifelse(is.numeric(size), size,
+                attrValues$size[as.character(size)])
+    })
+    symbolData <- getSymbolData(ped, pedalign, symbolAttrs)
 
     # INITIALIZE PLOT #########################################################
     plt <- ggplot(mapping = aes(x = x, y = y)) +
@@ -261,12 +221,35 @@ ggpedigree <- function(ped,
     return(plt)
 }
 
+#' Return valid symbol attributes
+#'
+#' @param symbolAttrs
+#'      Named list of symbol attributes, with elements shape, fill, border,
+#'      size, and alpha
+#' @param n
+#'      Integer giving the required length of each symbol attribute
+#' @return
+#'      Named list of symbol attributes, with default attributes in place of
+#'      NULLs and checking all attributes for validity
+validSymbolAttrs <- function(symbolAttrs, n) {
+    # Assign mock default values to unused (NULL-valued) symbol attributes
+    symbolAttrs <- lapply(names(symbolAttrs), function(name) {
+        ifelse(is.null(symbolAttrs[[name]]),
+            defaultSymbolAttr(name, n),
+            symbolAttrs[[name]])
+        })
+    # Check that attributes are valid
+    symbolAttrs <- lapply(names(symbolAttrs), function(name) {
+        checkSymbolAttr(symbolAttrs[[name]], n, name)
+        })
+    return(symbolAttrs)
+}
+
 #' Default symbol attributes
 #'
 #' @param name
 #'      String. One of: shape, fill, border, size, and alpha
-#' @param n
-#'      Integer. Length of the attribute vector
+#' @inheritParams validSymbolAttrs
 #' @return
 #'      Factor or numeric vector. Default value of symbol attributes suitable
 #'      for symbol{shape,fill,border,size,alpha}
@@ -288,20 +271,17 @@ defaultSymbolAttr <- function(name, n) {
 #'
 #' @param symbolAttr
 #'      Symbol attribute to be checked.
-#' @param n
-#'      Integer. Required length of the attribute vector
-#' @param name
-#'      String. Name of the attribute being checked. One of: shape, fill,
-#'      border, size, and alpha
+#' @inheritParams validSymbolAttrs
+#' @inheritParams defaultSymbolAttr
 #' @return
 #'      Factor or numeric vector of length n
-validSymbolAttr <- function(symbolAttr, n, name) {
+checkSymbolAttr <- function(symbolAttr, n, name) {
     symbolAttr <- switch(class(symbolAttr),
-        "factor" = symbolAttr,
-        "numeric" = symbolAttr,
+        "factor"    = symbolAttr,
+        "numeric"   = symbolAttr,
         "character" = factor(symbolAttr),
-        "logical" = factor(symbolAttr),
-        "integer" = factor(symbolAttr),
+        "logical"   = factor(symbolAttr),
+        "integer"   = factor(symbolAttr),
         stop(sprintf(paste("symbol%s must be a vector of type factor or,",
                     "numeric (or character, logical or integer)"),
                 name)))
@@ -314,6 +294,27 @@ validSymbolAttr <- function(symbolAttr, n, name) {
     return(symbolAttr)
 }
 
+#' Return valid attribute values
+#'
+#' @param attrValues
+#'      Named list of attribute values, with elements shape, fill, border,
+#'      size and alpha
+#' @inheritParams validSymbolAttrs
+#' @param symbolAttrWasNull
+#'      Named list of boolean values, indicating whether the corresponding
+#'      symbol attribute was NULL (before being assigned a mock default value)
+#' @return
+#'      Named list of valid attribute values, with NULL values replaced with
+#'      suitable defaults
+validAttrValues <- function(attrValues, symbolAttrs, symbolAttrWasNull) {
+    attrValues <- lapply(names(attrValues), function(name) {
+        ifelse(is.null(attrValues[[name]]),
+            defaultAttrValue(name, symbolAttrs[[name]]),
+            attrValues[[name]])
+        })
+    return(attrValues)
+}
+
 #' Default attribute values
 #'
 #' @param name
@@ -323,27 +324,37 @@ validSymbolAttr <- function(symbolAttr, n, name) {
 #' @return
 #'      Character vector. Default value of attribute values suitable for
 #'      {fill,border,size,alpha}values
-#' @import RColorBrewer
+#' @import RColorBrewer, scales
 defaultAttrValue <- function(name, symbolAttr) {
     if(is.factor(symbolAttr)) {
         if(nlevels(symbolAttr) > 3)
             stop(sprintf(paste("'symbol%s' argument has more than 3 levels.",
                         "Specify '%svalues'"), name, name))
-        attrValues <- switch(name,
-            "fill" = c("white", "gray25", "gray65"),
-            "color" = brewer.pal(3, "Dark2"),
-            "size" = c(3, 15),
-            "alpha" = c(1, 0.2),
+        attrValue <- switch(name,
+            "fill"   = switch(nlevels(symbolAttr),
+                        c("white"),
+                        c("white", "gray25"),
+                        c("white", "gray65", "gray25")),
+            "border" = switch(nlevels(symbolAttr),
+                        c("gray90"),
+                        c("gray90", "#C66E00"),
+                        c("gray90", "#009DCF", "#C66E00")),
+            "size"   = c(1, 2, 3)[1:nlevels(symbolAttr)],
+            "alpha"  = switch(nlevels(symbolAttr),
+                        c(1),
+                        c(1, 0.2),
+                        c(1, 0.6, 0.2)),
             stop(sprintf(paste("Internal error: '%s' is an invalid 'name'",
                         "argument; must be one of:",
                         "shape, fill, border, size, and alpha"),
                     name)))
+        names(attrValue) <- levels(symbolAttr)
     } else if(is.numeric(symbolAttr)) {
-        attrValues <- switch(name,
-            "fill" = c("white", "gray25", "gray65"),
-            "color" = brewer.pal(3, "Dark2"),
-            "size" = c(3, 15),
-            "alpha" = c(1, 0.2),
+        attrValue <- switch(name,
+            "fill"   = c(low = "white",   high = "black"),
+            "border" = c(low = "#fee5d9", high = "#a50f15"),
+            "size"   = c(low = 3,         high = 15),
+            "alpha"  = c(low = 0.2,       high = 1),
             stop(sprintf(paste("Internal error: '%s' is an invalid 'name'",
                         "argument; must be one of:",
                         "shape, fill, border, size, and alpha"),
@@ -354,7 +365,31 @@ defaultAttrValue <- function(name, symbolAttr) {
                     "shape, fill, border, size, and alpha"),
                 name)))
     }
-        # bordervalues = c("black", "red", "cyan"),
-        # sizevalues   = c(7.5, 10, 5),
-        # alphavalues  = c(1, 0.3, 0.6),
+    return(attrValue)
+}
+
+#' Construct symbol plotting data
+#'
+#' @inheritParams ggpedigree
+#' @inheritParams validSymbolAttrs
+#' @return
+#'      dataframe to be use as ggplot data for symbol layers
+getSymbolData <- function(ped, pedalign, symbolAttrs) {
+    # Build ggplot data
+    # Generate plotting data from ped and pedalign
+    # Values in pos give horizontal position, row number of pos gives vertical
+    xpos <- pos
+    ypos <- matrix(rep(1:nrow(nid), ncol(nid)), nrow = nrow(nid), byrow = FALSE)
+    # xpos and ypos are matrices corresponding to the 2d layout of the pedigree
+    # Extract a vector; subset and order it so xpos, ypos correspond to id
+    posSubset <- as.vector(nid) != 0
+    posOrder <- order(nid[posSubset])
+    xpos <- pos[posSubset][posOrder]
+    ypos <- ypos[posSubset][posOrder]
+    # Sanity check that data elements have same length
+    if(length(id) != length(xpos) || length(id) != length(ypos))
+        stop("Internal error: xpos and/or ypos do not match id in length")
+    symbolData <- do.call(data.frame, c(list(id = id, x = xpos, y = ypos,
+                shape = sex), symbolAttrs))
+    symbolAttrMapping <- aes_all(c("x", "y", "shape", names(symbolAttrs)))
 }
