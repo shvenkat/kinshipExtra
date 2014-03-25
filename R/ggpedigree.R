@@ -127,14 +127,13 @@ ggpedigree <- function(ped,
     symbolAttrs <- validSymbolAttrs(symbolAttrs, length(ped$id))
 
     attrValues <- list(
-        "shape"  = as.integer(c("male" = 1, "female" = 2, "unknown" = 3,
-                    "terminated" = 4)),
+        "shape"  = c("male" = 1, "female" = 2, "unknown" = 3, "terminated" = 4),
         "fill"   = fillvalues,
         "border" = bordervalues,
         "size"   = sizevalues,
         "alpha"  = alphavalues)
     attrValueWasNull <- lapply(attrValues, is.null)
-    attrValues <- validAttrValues(attrValues, symbolAttrs, symbolAttrWasNull)
+    attrValues <- validAttrValues(attrValues, symbolAttrs)
 
     if(!is.numeric(labelsize) || length(labelsize) != 1 || !is.finite(labelsize)
         || labelsize < 0)
@@ -145,78 +144,103 @@ ggpedigree <- function(ped,
     # Special handling of shape and size is needed due to the non-uniform
     # apparent size of the standard plotting symbol shapes
     symbolAttrs <- within(symbolAttrs, {
-        shape  <- attrValues$shape[as.character(shape)]
-        size   <- ifelse(is.numeric(size), size,
+        shape <- attrValues$shape[as.character(shape)]
+        size  <- ifelse(is.numeric(size),
+                scaleMinMax(size,
+                    attrValues$size["low"],
+                    attrValues$size["high"]),
                 attrValues$size[as.character(size)])
     })
-    symbolData <- getSymbolData(ped, pedalign, symbolAttrs)
+    symbolData   <- getSymbolData(ped, pedalign, symbolAttrs)
+    statusData   <- getStatusData(symbolData, attrValues$size)
+    relationData <- getRelationData(ped, pedalign)
 
     # INITIALIZE PLOT #########################################################
-    plt <- ggplot(mapping = aes(x = x, y = y)) +
-        theme(panel.grid = element_blank(),
+    plt <- ggplot() +
+        theme(
+            panel.grid = element_blank(),
             axis.title = element_blank(),
-            axis.text = element_blank(),
+            axis.text  = element_blank(),
             axis.ticks = element_blank(),
-            axis.line = element_blank())
-
-    # Build ggplot symbol layer
-    plt <- plt +
-        geom_point(
-            data = symbolData,
-            mapping = aes(
-                shape = as.integer(c(15, 16, 18, 17)[shape]))) +
-        geom_point(
-            data = symbolData,
-            mapping = aes(
-                shape = as.integer(c(15, 16, 18, 17)[shape]))) +
-        geom_point(
-            data = symbolData,
-            mapping = aes(
-                shape = as.integer(c(22, 21, 23, 24)[shape]))) +
-        scale_x_continuous(expand = c(0.1, 0.1)) +
-        scale_y_continuous(expand = c(0.1, 0.1)) +
-        scale_shape_identity() +
-        guides(shape = "none", fill = "none", color = "none", size = "none",
-            alpha = "none")
-
-    if("size" %in% symbolAttrMapping)
-        plt <- plt +
-            geom_point(data = symbolData, mapping = symbolAttrMapping) +
-            scale_size_manual(values = c(7.5, 12.5))
-    else
-        plt <- plt +
-            geom_point(data = symbolData, mapping = symbolAttrMapping,
-                size = 7.5)
-    plt <- plt +
-        scale_y_continuous(trans = reverse_trans(), expand = c(0.1, 0)) +
-        scale_shape_manual(values = c("male" = 22, "female" = 21,
-                "unknown" = 23, "terminated" = 24)) +
-        scale_fill_manual(values = c("white", "gray25")) +
-        scale_color_manual(values = c("black", "red")) +
-        scale_alpha_manual(values = c(1, 0.5)) +
-        guides(shape = guide_legend(title = NULL),
-            fill  = guide_legend(title = NULL, override.aes = list(shape = 22)),
-            color = guide_legend(title = NULL, override.aes = list(shape = 22)),
-            size  = guide_legend(title = NULL, override.aes = list(shape = 22)),
-            alpha = guide_legend(title = NULL, override.aes = list(shape = 22)))
-    # if("color" %in% symbolAttrMapping) {
-    #     if("size" %in% symbolAttrMapping)
-    #         plt <- plt +
-    #             geom_point(data = symbolData,
-    #                 mapping = aes_all(c("x", "y", "shape", setdiff(names(symbolAttrs), "fill")))) +
-    #             scale_size_manual(values = c(7.5, 12.5) * 1.25)
-    #     else
-    #         plt <- plt +
-    #             geom_point(data = symbolData,
-    #                 mapping = aes_all(c("x", "y", "shape", setdiff(names(symbolAttrs), "fill"))),
-    #                 size = 7.5 * 1.25)
-    # }
-
-    # PLOT LINE SEGMENTS SHOWING STATUS (ALIVE or DECEASED)
+            axis.line  = element_blank())
 
     # PLOT LINE SEGMENTS SHOWING RELATIONSHIPS
 
+    # PLOT SYMBOLS SHOWING INDIVIDUALS
+    plt <- plt +
+        geom_point(                # cover up relationship lines under symbols
+            data    = symbolData,
+            mapping = aes(
+                x     = x,
+                y     = y,
+                shape = as.integer(c(15, 16, 18, 17)[shape]),
+                size  = as.numeric(size * c(1.25, 1.45, 1.51, 1.05)[shape])),
+            color   = "gray90",
+            alpha   = 1) +
+        geom_point(                # symbol border
+            data    = symbolData,
+            mapping = aes(
+                x     = x,
+                y     = y,
+                shape = as.integer(c(15, 16, 18, 17)[shape]),
+                color = border,
+                size  = as.numeric(size * c(1.25, 1.45, 1.51, 1.05)[shape]),
+                alpha = alpha)) +
+        geom_point(                # spacer
+            data    = symbolData,
+            mapping = aes(
+                x     = x,
+                y     = y,
+                shape = as.integer(c(15, 16, 18, 17)[shape]),
+                size  = as.numeric(size * c(1.05, 1.24, 1.26, 0.82)[shape]),
+                alpha = alpha),
+            color   = "gray90")) +
+        geom_point(                # symbol fill
+            data    = symbolData,
+            mapping = aes(
+                x     = x,
+                y     = y,
+                shape = as.integer(c(22, 21, 23, 24)[shape]),
+                fill  = fill,
+                size  = as.numeric(size * c(1, 1.05, 0.8, 0.6)[shape]),
+                alpha = alpha),
+            color = "gray20") +
+        scale_x_continuous(expand = c(0.1, 0.1)) +
+        scale_y_continuous(expand = c(0.1, 0.1), trans = reverse_trans()) +
+        scale_shape_identity() +
+        ifelse(is.factor(symbolAttrs$fill),
+            scale_fill_manual(values = attrValues$fill),
+            scale_fill_gradient(
+                low  = attrValues$fill["low"],
+                high = attrValues$fill["high"])) +
+        ifelse(is.factor(symbolAttrs$border),
+            scale_color_manual(values = attrValues$border),
+            scale_color_gradient(
+                low  = attrValues$border["low"],
+                high = attrValues$border["high"])) +
+        scale_size_identity() +
+        ifelse(is.factor(symbolAttrs$alpha),
+            scale_alpha_manual(values = attrValues$alpha),
+            scale_alpha_continuous(range = c(
+                    low  = attrValues$alpha["low"],
+                    high = attrValues$alpha["high"]))) +
+        guides(
+            shape = "none",
+            fill  = "none",
+            color = "none",
+            size  = "none",
+            alpha = "none")
+
+    # PLOT LINE SEGMENTS SHOWING STATUS (ALIVE or DECEASED)
+
     # PLOT TEXT LABELS UNDER SYMBOLS
+
+    # PLOT LEGEND
+        # guides(shape = guide_legend(title = NULL),
+        #     fill  = guide_legend(title = NULL, override.aes = list(shape = 22)),
+        #     color = guide_legend(title = NULL, override.aes = list(shape = 22)),
+        #     size  = guide_legend(title = NULL, override.aes = list(shape = 22)),
+        #     alpha = guide_legend(title = NULL, override.aes = list(shape = 22)))
 
     return(plt)
 }
@@ -300,18 +324,18 @@ checkSymbolAttr <- function(symbolAttr, n, name) {
 #'      Named list of attribute values, with elements shape, fill, border,
 #'      size and alpha
 #' @inheritParams validSymbolAttrs
-#' @param symbolAttrWasNull
-#'      Named list of boolean values, indicating whether the corresponding
-#'      symbol attribute was NULL (before being assigned a mock default value)
 #' @return
 #'      Named list of valid attribute values, with NULL values replaced with
 #'      suitable defaults
-validAttrValues <- function(attrValues, symbolAttrs, symbolAttrWasNull) {
+validAttrValues <- function(attrValues, symbolAttrs) {
     attrValues <- lapply(names(attrValues), function(name) {
         ifelse(is.null(attrValues[[name]]),
             defaultAttrValue(name, symbolAttrs[[name]]),
             attrValues[[name]])
         })
+    attrValues <- lapply(names(attrValues), function(name) {
+        checkAttrValue(attrValues[[name]], symbolAttrs[[name]], name)
+    })
     return(attrValues)
 }
 
@@ -368,6 +392,66 @@ defaultAttrValue <- function(name, symbolAttr) {
     return(attrValue)
 }
 
+#' Check validity of attribute values
+#'
+#' @param attrValue
+#'      Named vector used to map symbol attributes to plot values
+#' @inheritParams defaultAttrValue
+#' @return
+#'      Named vector of valid attribute values
+checkAttrValue <- function(attrValue, symbolAttr, name) {
+    if(is.factor(symbolAttr)) {
+        if(!setequal(levels(symbolAttr), names(attrValue))) {
+            if(all(levels(symbolAttr) %in% names(attrValue))) {
+                attrValue <- attrValue[levels(symbolAttr)]
+            } else if(is.null(names(attrValue)) &&
+                length(attrValue) == nlevels(symbolAttr)) {
+                names(attrValue) <- levels(symbolAttr)
+            } else {
+                stop(sprintf(paste("%svalues must be a named vector,",
+                        "with values for each level of the factor symbol%s"),
+                    name, name))
+            }
+        }
+    } else if (is.numeric(symbolAttr)) {
+        if(!setequal(c("low", "high"), names(attrValue))) {
+            if(all(c("low", "high") %in% names(attrValue))) {
+                attrValue <- attrValue[c("low", "high")]
+            } else if(is.null(names(attrValue)) && length(attrValue) == 2) {
+                names(attrValue) <- c("low", "high")
+            } else {
+                stop(sprintf(paste("%svalues must be a named vector with",
+                            "values named 'low' and 'high' to scale symbol%s"),
+                        name, name))
+            }
+        }
+    } else {
+        stop(sprintf(paste("Internal error: symbol%s must be a factor or",
+                    "numeric vector"), name))
+    }
+    # fill and border values take multiple valid formats e.g. "blue", "#aabbcc"
+    # size and alpha values must be numeric
+    if(name %in% c("size", "alpha")) {
+        if(!all(is.numeric(attrValue))) {
+            stop(sprintf("%svalues must be numeric", name))
+        }
+    }
+    return(attrValue)
+}
+
+#' Scale linearly between two bounds
+#'
+#' @param x
+#'      Numeric values to be scaled
+#' @param newMin
+#' @param newMax
+#'      Lower and upper bounds of the scaled values
+#' @return
+#'      Numeric values linearly scaled between min and max
+scaleMinMax <- function(x, newMin, newMax) {
+    return( newMin + (newMax - newMin) * (x - min(x)) / (max(x) - min(x)) )
+}
+
 #' Construct symbol plotting data
 #'
 #' @inheritParams ggpedigree
@@ -375,21 +459,32 @@ defaultAttrValue <- function(name, symbolAttr) {
 #' @return
 #'      dataframe to be use as ggplot data for symbol layers
 getSymbolData <- function(ped, pedalign, symbolAttrs) {
-    # Build ggplot data
-    # Generate plotting data from ped and pedalign
     # Values in pos give horizontal position, row number of pos gives vertical
-    xpos <- pos
-    ypos <- matrix(rep(1:nrow(nid), ncol(nid)), nrow = nrow(nid), byrow = FALSE)
+    xpos <- pedalign$pos
+    ypos <- matrix(rep(1:nrow(pedalign$nid), ncol(pedalign$nid)),
+            nrow = nrow(pedalign$nid), byrow = FALSE)
     # xpos and ypos are matrices corresponding to the 2d layout of the pedigree
-    # Extract a vector; subset and order it so xpos, ypos correspond to id
-    posSubset <- as.vector(nid) != 0
-    posOrder <- order(nid[posSubset])
-    xpos <- pos[posSubset][posOrder]
+    # Extract a vector; subset and order it so xpos, ypos correspond to ped$id
+    posSubset <- as.vector(pedalign$nid) != 0
+    posOrder <- order(pedalign$nid[posSubset])
+    xpos <- xpos[posSubset][posOrder]
     ypos <- ypos[posSubset][posOrder]
     # Sanity check that data elements have same length
-    if(length(id) != length(xpos) || length(id) != length(ypos))
-        stop("Internal error: xpos and/or ypos do not match id in length")
-    symbolData <- do.call(data.frame, c(list(id = id, x = xpos, y = ypos,
-                shape = sex), symbolAttrs))
-    symbolAttrMapping <- aes_all(c("x", "y", "shape", names(symbolAttrs)))
+    if(length(ped$id) != length(xpos) || length(ped$id) != length(ypos))
+        stop("Internal error: xpos and/or ypos do not match ped$id in length")
+    symbolData <- do.call(data.frame, c(list(id = ped$id, x = xpos, y = ypos),
+            symbolAttrs))
+    return(symbolData)
+}
+
+#' Construct symbol status plotting data to indicate deceased individuals
+#'
+#' @param symbolData
+#'      dataframe with symbol plotting data
+#' @param sizeValues
+#'      named vector mapping symbolData$size
+getStatusData <- function(symbolData, attrValues$size) {
+    dead <- ped$id[ped$status != 0]
+    symbolData <- symbolData[symbolData$id %in% dead, c("id", "x", "y", "size")]
+    statusData
 }
