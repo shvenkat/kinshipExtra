@@ -154,11 +154,11 @@ ggpedigree <- function(ped,
     # apparent size of the standard plotting symbol shapes
     symbolAttrs <- within(symbolAttrs, {
         shape <- attrValues$shape[as.character(shape)]
-        size  <- ifelse(is.numeric(size),
-                scaleMinMax(size,
+        size  <- switch(is.numeric(size),
+                "TRUE"  = scaleMinMax(size,
                     attrValues$size["low"],
                     attrValues$size["high"]),
-                attrValues$size[as.character(size)])
+                "FALSE" = attrValues$size[as.character(size)])
     })
     relationData <- getRelationData(ped, pedalign)
     symbolData   <- getSymbolData(ped, pedalign, symbolAttrs)
@@ -168,11 +168,32 @@ ggpedigree <- function(ped,
     # BUILD PLOT ##############################################################
     plt <- ggplot() +
         theme(
-            panel.grid = element_blank(),
+            # panel.grid = element_blank(),
             axis.title = element_blank(),
-            axis.text  = element_blank(),
+            # axis.text  = element_blank(),
             axis.ticks = element_blank(),
             axis.line  = element_blank())
+
+    # Plot symbol borders first so they appear UNDER relationship lines
+    plt <- plt +
+        geom_point(                # symbol border
+            data    = symbolData,
+            mapping = aes(
+                x     = x,
+                y     = y,
+                shape = as.integer(c(15, 16, 18, 17)[shape]),
+                color = border,
+                size  = as.numeric(size * c(1.25, 1.45, 1.51, 1.05)[shape]),
+                alpha = alpha)) +
+        geom_point(                # spacer
+            data    = symbolData,
+            mapping = aes(
+                x     = x,
+                y     = y,
+                shape = as.integer(c(15, 16, 18, 17)[shape]),
+                size  = as.numeric(size * c(1.05, 1.24, 1.26, 0.82)[shape]),
+                alpha = alpha),
+            color   = "gray90")
 
     # Plot line segments showing relationships
     plt <- plt +
@@ -193,28 +214,11 @@ ggpedigree <- function(ped,
             mapping = aes(
                 x     = x,
                 y     = y,
-                shape = as.integer(c(15, 16, 18, 17)[shape]),
-                size  = as.numeric(size * c(1.25, 1.45, 1.51, 1.05)[shape])),
+                shape = as.integer(c(22, 21, 23, 24)[shape]),
+                size  = as.numeric(size * c(1, 1.05, 0.8, 0.6)[shape])),
+            fill    = "gray90",
             color   = "gray90",
             alpha   = 1) +
-        geom_point(                # symbol border
-            data    = symbolData,
-            mapping = aes(
-                x     = x,
-                y     = y,
-                shape = as.integer(c(15, 16, 18, 17)[shape]),
-                color = border,
-                size  = as.numeric(size * c(1.25, 1.45, 1.51, 1.05)[shape]),
-                alpha = alpha)) +
-        geom_point(                # spacer
-            data    = symbolData,
-            mapping = aes(
-                x     = x,
-                y     = y,
-                shape = as.integer(c(15, 16, 18, 17)[shape]),
-                size  = as.numeric(size * c(1.05, 1.24, 1.26, 0.82)[shape]),
-                alpha = alpha),
-            color   = "gray90") +
         geom_point(                # symbol fill and outline
             data    = symbolData,
             mapping = aes(
@@ -224,26 +228,7 @@ ggpedigree <- function(ped,
                 fill  = fill,
                 size  = as.numeric(size * c(1, 1.05, 0.8, 0.6)[shape]),
                 alpha = alpha),
-            color = "gray20") +
-        scale_x_continuous(expand = c(0.1, 0.1)) +
-        scale_y_continuous(expand = c(0.1, 0.1), trans = reverse_trans()) +
-        scale_shape_identity() +
-        switch(is.factor(symbolAttrs$fill),
-            "TRUE"  = scale_fill_manual(values = attrValues$fill),
-            "FALSE" = scale_fill_gradient(
-                low  = attrValues$fill["low"],
-                high = attrValues$fill["high"])) +
-        switch(is.factor(symbolAttrs$border),
-            "TRUE"  = scale_color_manual(values = attrValues$border),
-            "FALSE" = scale_color_gradient(
-                low  = attrValues$border["low"],
-                high = attrValues$border["high"])) +
-        scale_size_identity() +
-        switch(is.factor(symbolAttrs$alpha),
-            "TRUE"  = scale_alpha_manual(values = attrValues$alpha),
-            "FALSE" = scale_alpha_continuous(range = c(
-                    low  = attrValues$alpha["low"],
-                    high = attrValues$alpha["high"])))
+            color = "gray20")
 
     # Plot line segments showing status (alive/censored or deceased)
     if(nrow(statusData) > 0) {
@@ -272,6 +257,28 @@ ggpedigree <- function(ped,
             color   = "black",
             hjust   = 0.5,
             vjust   = 1)
+
+    # Set the scale for ggplot aesthetics
+    plt <- plt +
+        scale_x_continuous(expand = c(0.1, 0.1)) +
+        scale_y_continuous(expand = c(0.1, 0.1), trans = reverse_trans()) +
+        scale_shape_identity() +
+        switch(is.factor(symbolAttrs$fill),
+            "TRUE"  = scale_fill_manual(values = attrValues$fill),
+            "FALSE" = scale_fill_gradient(
+                low  = attrValues$fill["low"],
+                high = attrValues$fill["high"])) +
+        switch(is.factor(symbolAttrs$border),
+            "TRUE"  = scale_color_manual(values = attrValues$border),
+            "FALSE" = scale_color_gradient(
+                low  = attrValues$border["low"],
+                high = attrValues$border["high"])) +
+        scale_size_identity() +
+        switch(is.factor(symbolAttrs$alpha),
+            "TRUE"  = scale_alpha_manual(values = attrValues$alpha),
+            "FALSE" = scale_alpha_continuous(range = c(
+                    low  = attrValues$alpha["low"],
+                    high = attrValues$alpha["high"])))
 
     # Plot legend
     plt <- plt + guides(
@@ -612,8 +619,8 @@ getLabelData <- function(symbolData, labelText) {
     labelData <- data.frame(
         label = as.character(symbolData$id),
         x     = symbolData$x,
-        y     = symbolData$y + symbolData$size/2,
-        size  = symbolData$size,
+        y     = symbolData$y + 0.05 * symbolData$size / 2,
+        size  = symbolData$size / 2,
         alpha = symbolData$alpha)
     if(!is.null(labelText))
         labelData$label <- paste(labelData$label, labelText, sep = "\n")
