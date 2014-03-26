@@ -167,14 +167,14 @@ ggpedigree <- function(ped,
     relationData <- getRelationData(ped, pedalign)
     symbolData   <- getSymbolData(ped, pedalign, symbolAttrs)
     statusData   <- getStatusData(ped, symbolData)
-    labelData    <- getLabelData(symbolData, labeltext)
+    labelData    <- getLabelData(symbolData, labeltext, labelsize)
 
     # BUILD PLOT ##############################################################
     plt <- ggplot() +
         theme(
-            # panel.grid = element_blank(),
+            panel.grid = element_blank(),
             axis.title = element_blank(),
-            # axis.text  = element_blank(),
+            axis.text  = element_blank(),
             axis.ticks = element_blank(),
             axis.line  = element_blank())
 
@@ -608,10 +608,10 @@ getStatusData <- function(ped, symbolData) {
             c("id", "x", "y", "size", "alpha")]
     statusData <- data.frame(
         id    = symbolData$id,
-        x     = symbolData$x - symbolData$size/2 * cos(pi/4),
-        xend  = symbolData$x + symbolData$size/2 * cos(pi/4),
-        y     = symbolData$y - symbolData$size/2 * sin(pi/4),
-        yend  = symbolData$y + symbolData$size/2 * sin(pi/4),
+        x     = symbolData$x - 0.05 * symbolData$size/2 * cos(pi/4),
+        xend  = symbolData$x + 0.05 * symbolData$size/2 * cos(pi/4),
+        y     = symbolData$y + 0.05 * symbolData$size/2 * sin(pi/4),
+        yend  = symbolData$y - 0.05 * symbolData$size/2 * sin(pi/4),
         alpha = symbolData$alpha)
     return(statusData)
 }
@@ -621,15 +621,17 @@ getStatusData <- function(ped, symbolData) {
 #' @inheritParams getStatusData
 #' @param labelText
 #'      character vector of labels used in addition to ped$id for annotation
+#' @param labelSize
+#'      single numeric value used as size multiplier
 #' @return
 #'      dataframe to be used as ggplot data for label layer
-getLabelData <- function(symbolData, labelText) {
+getLabelData <- function(symbolData, labelText, labelSize) {
     labelData <- data.frame(
         label = as.character(symbolData$id),
         x     = symbolData$x,
         y     = symbolData$y,
         vjust = 1 + 0.15 * symbolData$size,
-        size  = symbolData$size / 2,
+        size  = symbolData$size / 2 * labelSize,
         alpha = symbolData$alpha)
     if(!is.null(labelText))
         labelData$label <- paste(labelData$label, labelText, sep = "\n")
