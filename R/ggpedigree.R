@@ -37,6 +37,9 @@
 #'      the corresponding factor levels. For numeric variables, specify the
 #'      high and low attribute values. Default values are provided, except for
 #'      factors with more than 3 levels.
+#' @param labeltext
+#'      (Optional) Character vector of labels to be printed below the symbols
+#'      in addition to ped$id.
 #' @param labelsize
 #'      (Optional) Label size multiplier, default 1.  Use 0 to avoid labeling symbols.
 #' @return
@@ -94,6 +97,7 @@ ggpedigree <- function(ped,
         bordervalues = NULL,
         sizevalues   = NULL,
         alphavalues  = NULL,
+        labeltext    = NULL,
         labelsize    = 1) {
 
     # CHECK ARGUMENTS #########################################################
@@ -104,13 +108,13 @@ ggpedigree <- function(ped,
 
     # If appropriate, assign a default value to symbolfill using ped$affected
     if(missing(symbolfill)) {
-        if(is.null(affected))
+        if(is.null(ped$affected))
             symbolfill <- NULL
         else {
-            if(is.matrix(affected))
-                symbolfill <- affected[, 1]
+            if(is.matrix(ped$affected))
+                symbolfill <- ped$affected[, 1]
             else
-                symbolfill <- affected
+                symbolfill <- ped$affected
             traitValues <- c("unaffected", "affected")
             symbolfill <- factor(traitValues[symbolfill + 1],
                     levels = traitValues)
@@ -135,6 +139,11 @@ ggpedigree <- function(ped,
     attrValueWasNull <- lapply(attrValues, is.null)
     attrValues <- validAttrValues(attrValues, symbolAttrs)
 
+    if(!is.null(labeltext)) {
+        if(!is.character(labeltext) || length(labeltext) != length(ped$id))
+            stop(paste("labeltext must be a character vector of the same",
+                    "length as ped$id"))
+    }
     if(!is.numeric(labelsize) || length(labelsize) != 1 || !is.finite(labelsize)
         || labelsize < 0)
         stop("'labelsize' must be a single positive finite numeric value")
@@ -151,11 +160,12 @@ ggpedigree <- function(ped,
                     attrValues$size["high"]),
                 attrValues$size[as.character(size)])
     })
-    symbolData   <- getSymbolData(ped, pedalign, symbolAttrs)
-    statusData   <- getStatusData(symbolData, attrValues$size)
     relationData <- getRelationData(ped, pedalign)
+    symbolData   <- getSymbolData(ped, pedalign, symbolAttrs)
+    statusData   <- getStatusData(ped, symbolData)
+    labelData    <- getLabelData(symbolData, labeltext)
 
-    # INITIALIZE PLOT #########################################################
+    # BUILD PLOT ##############################################################
     plt <- ggplot() +
         theme(
             panel.grid = element_blank(),
@@ -164,9 +174,19 @@ ggpedigree <- function(ped,
             axis.ticks = element_blank(),
             axis.line  = element_blank())
 
-    # PLOT LINE SEGMENTS SHOWING RELATIONSHIPS
+    # Plot line segments showing relationships
+    plt <- plt +
+        geom_segment(
+            data    = relationData,
+            mapping = aes(
+                x     = x,
+                xend  = xend,
+                y     = y,
+                yend  = yend),
+            alpha   = 1,
+            color   = "gray20")
 
-    # PLOT SYMBOLS SHOWING INDIVIDUALS
+    # Plot symbols showing individuals
     plt <- plt +
         geom_point(                # cover up relationship lines under symbols
             data    = symbolData,
@@ -194,8 +214,8 @@ ggpedigree <- function(ped,
                 shape = as.integer(c(15, 16, 18, 17)[shape]),
                 size  = as.numeric(size * c(1.05, 1.24, 1.26, 0.82)[shape]),
                 alpha = alpha),
-            color   = "gray90")) +
-        geom_point(                # symbol fill
+            color   = "gray90") +
+        geom_point(                # symbol fill and outline
             data    = symbolData,
             mapping = aes(
                 x     = x,
@@ -208,34 +228,58 @@ ggpedigree <- function(ped,
         scale_x_continuous(expand = c(0.1, 0.1)) +
         scale_y_continuous(expand = c(0.1, 0.1), trans = reverse_trans()) +
         scale_shape_identity() +
-        ifelse(is.factor(symbolAttrs$fill),
-            scale_fill_manual(values = attrValues$fill),
-            scale_fill_gradient(
+        switch(is.factor(symbolAttrs$fill),
+            "TRUE"  = scale_fill_manual(values = attrValues$fill),
+            "FALSE" = scale_fill_gradient(
                 low  = attrValues$fill["low"],
                 high = attrValues$fill["high"])) +
-        ifelse(is.factor(symbolAttrs$border),
-            scale_color_manual(values = attrValues$border),
-            scale_color_gradient(
+        switch(is.factor(symbolAttrs$border),
+            "TRUE"  = scale_color_manual(values = attrValues$border),
+            "FALSE" = scale_color_gradient(
                 low  = attrValues$border["low"],
                 high = attrValues$border["high"])) +
         scale_size_identity() +
-        ifelse(is.factor(symbolAttrs$alpha),
-            scale_alpha_manual(values = attrValues$alpha),
-            scale_alpha_continuous(range = c(
+        switch(is.factor(symbolAttrs$alpha),
+            "TRUE"  = scale_alpha_manual(values = attrValues$alpha),
+            "FALSE" = scale_alpha_continuous(range = c(
                     low  = attrValues$alpha["low"],
-                    high = attrValues$alpha["high"]))) +
-        guides(
+                    high = attrValues$alpha["high"])))
+
+    # Plot line segments showing status (alive/censored or deceased)
+    if(nrow(statusData) > 0) {
+        plt <- plt +
+            geom_segment(
+                data    = statusData,
+                mapping = aes(
+                    x     = x,
+                    xend  = xend,
+                    y     = y,
+                    yend  = yend,
+                    alpha = alpha),
+                color   = "gray20")
+    }
+
+    # Plot text labels under symbols
+    plt <- plt +
+        geom_text(
+            data    = labelData,
+            mapping = aes(
+                x     = x,
+                y     = y,
+                label = label,
+                size  = size,
+                alpha = alpha),
+            color   = "black",
+            hjust   = 0.5,
+            vjust   = 1)
+
+    # Plot legend
+    plt <- plt + guides(
             shape = "none",
             fill  = "none",
             color = "none",
             size  = "none",
             alpha = "none")
-
-    # PLOT LINE SEGMENTS SHOWING STATUS (ALIVE or DECEASED)
-
-    # PLOT TEXT LABELS UNDER SYMBOLS
-
-    # PLOT LEGEND
         # guides(shape = guide_legend(title = NULL),
         #     fill  = guide_legend(title = NULL, override.aes = list(shape = 22)),
         #     color = guide_legend(title = NULL, override.aes = list(shape = 22)),
@@ -256,14 +300,17 @@ ggpedigree <- function(ped,
 #'      Named list of symbol attributes, with default attributes in place of
 #'      NULLs and checking all attributes for validity
 validSymbolAttrs <- function(symbolAttrs, n) {
+    attrNames <- names(symbolAttrs)
+    names(attrNames) <- attrNames
     # Assign mock default values to unused (NULL-valued) symbol attributes
-    symbolAttrs <- lapply(names(symbolAttrs), function(name) {
-        ifelse(is.null(symbolAttrs[[name]]),
-            defaultSymbolAttr(name, n),
-            symbolAttrs[[name]])
+    symbolAttrs <- lapply(attrNames, function(name) {
+            if(is.null(symbolAttrs[[name]]))
+                return(defaultSymbolAttr(name, n))
+            else
+                return(symbolAttrs[[name]])
         })
     # Check that attributes are valid
-    symbolAttrs <- lapply(names(symbolAttrs), function(name) {
+    symbolAttrs <- lapply(attrNames, function(name) {
         checkSymbolAttr(symbolAttrs[[name]], n, name)
         })
     return(symbolAttrs)
@@ -328,12 +375,15 @@ checkSymbolAttr <- function(symbolAttr, n, name) {
 #'      Named list of valid attribute values, with NULL values replaced with
 #'      suitable defaults
 validAttrValues <- function(attrValues, symbolAttrs) {
-    attrValues <- lapply(names(attrValues), function(name) {
-        ifelse(is.null(attrValues[[name]]),
-            defaultAttrValue(name, symbolAttrs[[name]]),
-            attrValues[[name]])
+    attrNames <- names(symbolAttrs)
+    names(attrNames) <- attrNames
+    attrValues <- lapply(attrNames, function(name) {
+            if(is.null(attrValues[[name]]))
+                return(defaultAttrValue(name, symbolAttrs[[name]]))
+            else
+                return(attrValues[[name]])
         })
-    attrValues <- lapply(names(attrValues), function(name) {
+    attrValues <- lapply(attrNames, function(name) {
         checkAttrValue(attrValues[[name]], symbolAttrs[[name]], name)
     })
     return(attrValues)
@@ -384,10 +434,9 @@ defaultAttrValue <- function(name, symbolAttr) {
                         "shape, fill, border, size, and alpha"),
                     name)))
     } else {
-        stop(sprintf(paste("Internal error: '%s' is an invalid 'name'",
-                    "argument; must be one of:",
-                    "shape, fill, border, size, and alpha"),
-                name)))
+        stop(sprintf(paste("Internal error: symbolAttr is neither a factor",
+                    "nor a numeric vector, but a", class(symbolAttr)),
+                name))
     }
     return(attrValue)
 }
@@ -449,7 +498,60 @@ checkAttrValue <- function(attrValue, symbolAttr, name) {
 #' @return
 #'      Numeric values linearly scaled between min and max
 scaleMinMax <- function(x, newMin, newMax) {
-    return( newMin + (newMax - newMin) * (x - min(x)) / (max(x) - min(x)) )
+    if(max(x) > min(x))
+        return(newMin + (newMax - newMin) * (x - min(x)) / (max(x) - min(x)))
+    else
+        return(rep((newMin + newMax) / 2, length(x)))
+}
+
+#' Construct line segment plotting data to show relationships
+#'
+#' @inheritParams ggpedigree
+#' @return
+#'      dataframe to be used as ggplot data for relation layer
+getRelationData <- function(ped, pedalign) {
+    n      <- pedalign$n
+    nid    <- pedalign$nid
+    spouse <- pedalign$spouse
+    fam    <- pedalign$fam
+    pos    <- pedalign$pos
+    segmts <- list()
+    for(i in seq_along(n)) {
+        for(j in 1:n[i]) {
+            if(spouse[i, j] == 1) {
+                x      <- pos[i, j]
+                xend   <- pos[i, j+1]
+                y      <- i
+                yend   <- i
+                segmts <- append(segmts, list(c(x, xend, y, yend)))
+            }
+            if(fam[i, j] != 0) {
+                js <- which(fam[i, ] == fam[i, j])
+                if(j == js[1]) {
+                    xmin <- pos[i, min(js)]
+                    xmax <- pos[i, max(js)]
+                    jdad <- which(nid[i-1, ] == ped$findex[nid[i, j]])
+                    jmom <- which(nid[i-1, ] == ped$mindex[nid[i, j]])
+                    xlparent <- min(pos[i-1, jdad], pos[i-1, jmom])
+                    xrparent <- max(pos[i-1, jdad], pos[i-1, jmom])
+                    xmparent <- (xlparent + xrparent) / 2
+
+                    segmts <- append(segmts,
+                        list(c(xmparent, xmparent, i-1, i-0.5)))
+                    for(k in js) {
+                        segmts <- append(segmts,
+                            list(c(pos[i, k], pos[i, k], i, i-0.5)))
+                    }
+                    segmts <- append(segmts,
+                        list(c(min(xmin, xmparent), max(xmax, xmparent),
+                            i-0.5, i-0.5)))
+                }
+            }
+        }
+    }
+    relationData <- as.data.frame(t(do.call(data.frame, segmts)))
+    names(relationData) <- c("x", "xend", "y", "yend")
+    return(relationData)
 }
 
 #' Construct symbol plotting data
@@ -457,7 +559,7 @@ scaleMinMax <- function(x, newMin, newMax) {
 #' @inheritParams ggpedigree
 #' @inheritParams validSymbolAttrs
 #' @return
-#'      dataframe to be use as ggplot data for symbol layers
+#'      dataframe to be used as ggplot data for symbol layers
 getSymbolData <- function(ped, pedalign, symbolAttrs) {
     # Values in pos give horizontal position, row number of pos gives vertical
     xpos <- pedalign$pos
@@ -479,12 +581,43 @@ getSymbolData <- function(ped, pedalign, symbolAttrs) {
 
 #' Construct symbol status plotting data to indicate deceased individuals
 #'
+#' @inheritParams ggpedigree
 #' @param symbolData
 #'      dataframe with symbol plotting data
-#' @param sizeValues
-#'      named vector mapping symbolData$size
-getStatusData <- function(symbolData, attrValues$size) {
-    dead <- ped$id[ped$status != 0]
-    symbolData <- symbolData[symbolData$id %in% dead, c("id", "x", "y", "size")]
-    statusData
+#' @return
+#'      dataframe to be used as ggplot data for status layer
+getStatusData <- function(ped, symbolData) {
+    dead <- ped$id[ped$status == 1]
+    symbolData <- symbolData[
+            symbolData$id %in% dead,
+            c("id", "x", "y", "size", "alpha")]
+    statusData <- data.frame(
+        id    = symbolData$id,
+        x     = symbolData$x - symbolData$size/2 * cos(pi/4),
+        xend  = symbolData$x + symbolData$size/2 * cos(pi/4),
+        y     = symbolData$y - symbolData$size/2 * sin(pi/4),
+        yend  = symbolData$y + symbolData$size/2 * sin(pi/4),
+        alpha = symbolData$alpha)
+    return(statusData)
 }
+
+#' Construct label plotting data to annotate symbols
+#'
+#' @inheritParams getStatusData
+#' @param labelText
+#'      character vector of labels used in addition to ped$id for annotation
+#' @return
+#'      dataframe to be used as ggplot data for label layer
+getLabelData <- function(symbolData, labelText) {
+    labelData <- data.frame(
+        label = as.character(symbolData$id),
+        x     = symbolData$x,
+        y     = symbolData$y + symbolData$size/2,
+        size  = symbolData$size,
+        alpha = symbolData$alpha)
+    if(!is.null(labelText))
+        labelData$label <- paste(labelData$label, labelText, sep = "\n")
+    return(labelData)
+}
+
+# TODO: support the case when an individual is shown more than once
