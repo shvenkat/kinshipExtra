@@ -41,7 +41,10 @@
 #'      (Optional) Character vector of labels to be printed below the symbols
 #'      in addition to ped$id.
 #' @param labelsize
-#'      (Optional) Label size multiplier, default 1.  Use 0 to avoid labeling symbols.
+#'      (Optional) Label size multiplier, default 1. Use 0 to avoid labeling
+#'      symbols.
+#' @param bgcolor
+#'      (Optional) Plot background color, default "gray90" i.e. light gray
 #' @return
 #'      ggplot object, including legend.
 #' @section Details:
@@ -98,7 +101,8 @@ ggpedigree <- function(ped,
         sizevalues   = NULL,
         alphavalues  = NULL,
         labeltext    = NULL,
-        labelsize    = 1) {
+        labelsize    = 1,
+        bgcolor      = "gray90") {
 
     # CHECK ARGUMENTS #########################################################
 
@@ -137,7 +141,7 @@ ggpedigree <- function(ped,
         "size"   = sizevalues,
         "alpha"  = alphavalues)
     attrValueWasNull <- lapply(attrValues, is.null)
-    attrValues <- validAttrValues(attrValues, symbolAttrs)
+    attrValues <- validAttrValues(attrValues, symbolAttrs, bgcolor)
 
     if(!is.null(labeltext)) {
         if(!is.character(labeltext) || length(labeltext) != length(ped$id))
@@ -183,7 +187,7 @@ ggpedigree <- function(ped,
                 y     = y,
                 shape = as.integer(c(15, 16, 18, 17)[shape]),
                 color = border,
-                size  = as.numeric(size * c(1.25, 1.45, 1.51, 1.05)[shape]),
+                size  = as.numeric(size * c(1.25, 1.4, 1.46, 1.02)[shape]),
                 alpha = alpha)) +
         geom_point(                # spacer
             data    = symbolData,
@@ -191,9 +195,9 @@ ggpedigree <- function(ped,
                 x     = x,
                 y     = y,
                 shape = as.integer(c(15, 16, 18, 17)[shape]),
-                size  = as.numeric(size * c(1.05, 1.24, 1.26, 0.82)[shape]),
+                size  = as.numeric(size * c(1.05, 1.2, 1.26, 0.82)[shape]),
                 alpha = alpha),
-            color   = "gray90")
+            color   = bgcolor)
 
     # Plot line segments showing relationships
     plt <- plt +
@@ -215,9 +219,9 @@ ggpedigree <- function(ped,
                 x     = x,
                 y     = y,
                 shape = as.integer(c(22, 21, 23, 24)[shape]),
-                size  = as.numeric(size * c(1, 1.05, 0.8, 0.6)[shape])),
-            fill    = "gray90",
-            color   = "gray90",
+                size  = as.numeric(size * c(1, 1, 0.8, 0.6)[shape])),
+            fill    = bgcolor,
+            color   = bgcolor,
             alpha   = 1) +
         geom_point(                # symbol fill and outline
             data    = symbolData,
@@ -226,7 +230,7 @@ ggpedigree <- function(ped,
                 y     = y,
                 shape = as.integer(c(22, 21, 23, 24)[shape]),
                 fill  = fill,
-                size  = as.numeric(size * c(1, 1.05, 0.8, 0.6)[shape]),
+                size  = as.numeric(size * c(1, 1, 0.8, 0.6)[shape]),
                 alpha = alpha),
             color = "gray20")
 
@@ -251,12 +255,13 @@ ggpedigree <- function(ped,
             mapping = aes(
                 x     = x,
                 y     = y,
+                vjust = vjust,
                 label = label,
                 size  = size,
                 alpha = alpha),
             color   = "black",
-            hjust   = 0.5,
-            vjust   = 1)
+            hjust   = 0.5)
+            # vjust   = 1)
 
     # Set the scale for ggplot aesthetics
     plt <- plt +
@@ -378,15 +383,17 @@ checkSymbolAttr <- function(symbolAttr, n, name) {
 #'      Named list of attribute values, with elements shape, fill, border,
 #'      size and alpha
 #' @inheritParams validSymbolAttrs
+#' @param bgColor
+#'      Plot background color
 #' @return
 #'      Named list of valid attribute values, with NULL values replaced with
 #'      suitable defaults
-validAttrValues <- function(attrValues, symbolAttrs) {
+validAttrValues <- function(attrValues, symbolAttrs, bgColor) {
     attrNames <- names(symbolAttrs)
     names(attrNames) <- attrNames
     attrValues <- lapply(attrNames, function(name) {
             if(is.null(attrValues[[name]]))
-                return(defaultAttrValue(name, symbolAttrs[[name]]))
+                return(defaultAttrValue(name, symbolAttrs[[name]], bgColor))
             else
                 return(attrValues[[name]])
         })
@@ -402,11 +409,12 @@ validAttrValues <- function(attrValues, symbolAttrs) {
 #'      String. One of: fill, border, size, and alpha
 #' @param symbolAttr
 #'      Factor or numeric vector. Symbol attributes.
+#' @inheritParams validAttrValues
 #' @return
 #'      Character vector. Default value of attribute values suitable for
 #'      {fill,border,size,alpha}values
 #' @import RColorBrewer, scales
-defaultAttrValue <- function(name, symbolAttr) {
+defaultAttrValue <- function(name, symbolAttr, bgColor) {
     if(is.factor(symbolAttr)) {
         if(nlevels(symbolAttr) > 3)
             stop(sprintf(paste("'symbol%s' argument has more than 3 levels.",
@@ -417,9 +425,9 @@ defaultAttrValue <- function(name, symbolAttr) {
                         c("white", "gray25"),
                         c("white", "gray65", "gray25")),
             "border" = switch(nlevels(symbolAttr),
-                        c("gray90"),
-                        c("gray90", "#C66E00"),
-                        c("gray90", "#009DCF", "#C66E00")),
+                        c(bgColor),
+                        c(bgColor, "#C66E00"),
+                        c(bgColor, "#009DCF", "#C66E00")),
             "size"   = c(1, 2, 3)[1:nlevels(symbolAttr)],
             "alpha"  = switch(nlevels(symbolAttr),
                         c(1),
@@ -619,7 +627,8 @@ getLabelData <- function(symbolData, labelText) {
     labelData <- data.frame(
         label = as.character(symbolData$id),
         x     = symbolData$x,
-        y     = symbolData$y + 0.05 * symbolData$size / 2,
+        y     = symbolData$y,
+        vjust = 1 + 0.15 * symbolData$size,
         size  = symbolData$size / 2,
         alpha = symbolData$alpha)
     if(!is.null(labelText))
