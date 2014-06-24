@@ -1,12 +1,15 @@
+Encoding: UTF-8
 Package: kinshipExtra
 Version: 0.1
 License: GPL (>= 2)
 Title: Additional pedigree functions for the kinship2 package
-Description: Routines to plot a pedigree using a one dimensional layout, useful
-  to annotate the axis of another plot. Also, an alternative plotting mechanism
-  using ggplot2.
+Description: Routines to plot a pedigree using a one dimensional layout, which
+    is useful in annotating the axis of another plot to show relationships.
+    Also, an alternative plotting mechanism using ggplot2.
 Author: Shiv Venkatasubrahmanyam <shiv@alum.mit.edu>
 Maintainer: Shiv Venkatasubrahmanyam <shiv@alum.mit.edu>
 Imports:
-  kinship2 (>= 1.5.4),
-  ggplot2 (>= 0.9.3)
+    kinship2 (>= 1.5.4),
+    ggplot2 (>= 0.9.3),
+    scales
+LazyData: true

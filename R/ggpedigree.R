@@ -15,10 +15,7 @@
 #' @param pedalign
 #'      (Optional) Pedigree alignment, as returned by align.pedigree.1d.
 #'      Defaults to value returned by kinship2::align.pedigree.
-#' @param symbolfill
-#' @param symbolborder
-#' @param symbolsize
-#' @param symbolalpha
+#' @param symbolfill,symbolborder,symbolsize,symbolalpha
 #'      (Optional) Factors or numeric vectors specifying the values of
 #'      qualitative or quantitative traits (or other variables) respectively.
 #'      Must correspond to ped$id in length and order of values. Used to
@@ -28,10 +25,7 @@
 #'      (not recommended, see Details). If symbolfill is not provided and
 #'      ped$affected is available, it is used; use NULL to disable this
 #'      behavior.
-#' @param fillvalues
-#' @param bordervalues
-#' @param sizevalues
-#' @param alphavalues
+#' @param fillvalues,bordervalues,sizevalues,alphavalues
 #'      (Optional) Named vectors used to map trait or variable values to symbol
 #'      attribute values. For factor variables, provide attribute values for
 #'      the corresponding factor levels. For numeric variables, specify the
@@ -79,15 +73,18 @@
 #'      To fine tune the result, add the appropriate ggplot theme or legend
 #'      option to the return value.
 #' @examples
-#'      data(kinshipExtra)
+#'      library(kinship2)
+#'      library(ggplot2)
+#'      data(simpleped)
 #'      ggpedigree(ped1)
 #'      ggpedigree(ped1, align.pedigree.1d(ped1))
 #'      ggpedigree(ped1, symbolfill = ped1$affected)
 #'      ggpedigree(ped1,
 #'          symbolfill = factor(c("unaffected", "affected")[ped1$affected + 1],
-#'              levels = c("unaffected", "affected"))
-#'      ggpedigree(ped1, symbolfill = ped1$affected) +
-#'          scale_fill_manual(values = c("white", "blue"))
+#'                  levels = c("unaffected", "affected")))
+#'      ggpedigree(ped1,
+#'          symbolfill = factor(ped1$affected, levels = c("0", "1"))) +
+#'          scale_fill_manual(values = c("white", "red"))
 #' @import kinship2 ggplot2 scales
 #' @export
 ggpedigree <- function(ped,
@@ -413,7 +410,6 @@ validAttrValues <- function(attrValues, symbolAttrs, bgColor) {
 #' @return
 #'      Character vector. Default value of attribute values suitable for
 #'      {fill,border,size,alpha}values
-#' @import RColorBrewer, scales
 defaultAttrValue <- function(name, symbolAttr, bgColor) {
     if(is.factor(symbolAttr)) {
         if(nlevels(symbolAttr) > 3)
@@ -507,8 +503,7 @@ checkAttrValue <- function(attrValue, symbolAttr, name) {
 #'
 #' @param x
 #'      Numeric values to be scaled
-#' @param newMin
-#' @param newMax
+#' @param newMin,newMax
 #'      Lower and upper bounds of the scaled values
 #' @return
 #'      Numeric values linearly scaled between min and max

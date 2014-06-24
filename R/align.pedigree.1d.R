@@ -65,11 +65,7 @@ align.pedigree.1d.preserveorder <- function(pos) {
 #'
 #' This layout is the most "natural" looking 1d layout.
 #'
-#' @param pos
-#' @param n
-#' @param nid
-#' @param fam
-#' @param spouse
+#' @param pos,n,nid,fam,spouse
 #'     elements of the return value of kinship2::align.pedigree
 #' @param ped
 #'     pedigree object, as returned by kinship2::pedigree
@@ -190,8 +186,7 @@ pedpos.insert.right <- function(pos, i, js) {
 #' @param rxsibs
 #'     subset of extended sibship to be inserted to the right of parents, col(s)
 #'     of pos
-#' @param dad
-#' @param mom
+#' @param dad,mom
 #'     parents on level i - 1, col(s) of pos
 #' @return
 #'     updated pos matrix
