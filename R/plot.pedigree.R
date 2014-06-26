@@ -6,7 +6,7 @@ plot.pedigree <- function(x, id = x$id, status = x$status,
                           packed = TRUE, align = c(1.5,2), width = 8,
                           density=c(-1, 35,55,25), mar=c(4.1, 1, 4.1, 1),
                           angle=c(90,65,40,0), keep.par=FALSE,
-                          subregion, align.result, ...)
+                          subregion, ped.align, ...)
 {
     # Checks
     Call <- match.call()
@@ -93,8 +93,8 @@ plot.pedigree <- function(x, id = x$id, status = x$status,
         if (!is.null(plist$twins)) out$twins <- twin2[, 1:n, drop=F]
         out
         }
-    if(!missing(align.result))
-        plist <- align.result
+    if(!missing(ped.align))
+        plist <- ped.align
     else
         plist <- align.pedigree(x, packed = packed, width = width, align = align)
     if (!missing(subregion)) plist <- subregion2(plist, subregion)

@@ -57,18 +57,17 @@
 #'      * use a large size range when specifying sizevalues
 #'      * avoid using transparency to indicate more than two values
 #'
-#'      For qualitative/categorical variables as symbol{fill,border,size,alpha}
-#'      arguments, use factors instead of logical, integer and character
-#'      vectors for two reasons. First, you have control over the order of the
-#'      levels which determines how levels are mapped to attribute values. And
-#'      second, the levels are listed in the legend and descriptive string
-#'      levels are easy to interpret compared to integer codes such as 0 and 1.
+#'      For qualitative/categorical variables as symbol.. arguments, use
+#'      factors instead of logical, integer and character vectors for two
+#'      reasons. First, you have control over the order of the levels which
+#'      determines how levels are mapped to attribute values. And second, the
+#'      levels are listed in the legend and descriptive string levels are easy
+#'      to interpret compared to integer codes such as 0 and 1.
 #'
-#'      Use NA values in the symbol{fill,border,size,alpha} arguments at your
-#'      own risk; they are not supported. If needed, they can be assigned an
-#'      attribute value by adding a ggplot scale to the return value of
-#'      ggpedigree. For instance, \code{ggpedigree(...) +
-#'      scale_fill_gradient(..., na.value = "gray50")}.
+#'      Use NA values in the symbol.. arguments at your own risk; they are not
+#'      supported. If needed, they can be assigned an attribute value by adding
+#'      a ggplot scale to the return value of ggpedigree. For instance,
+#'      \code{ggpedigree(...) + scale_fill_gradient(..., na.value = "gray50")}.
 #'
 #'      To fine tune the result, add the appropriate ggplot theme or legend
 #'      option to the return value.

@@ -205,3 +205,45 @@ pedpos.insert.flanking <- function(pos, i, lxsibs, rxsibs, dad, mom) {
     pos[i, rxsibs] <- (poslparent + ll + 2):(poslparent + ll + rr + 1)
     return(pos)
 }
+
+#' Pedigree permutation in (horizontal) plotting order
+#'
+#' This function returns a permutation that orders the members of a pedigree
+#' according to their horizontal plot position. In other words,
+#' \code{ped$id[pedOrder(x)]} gives the pedigree member identifiers in the same
+#' order as their horizontal position in pedigree alignment \code{x}.
+#'
+#' @param ped.align
+#'      pedigree alignment, as returned by align.pedigree.1d or
+#'      kinship2::align.pedigree
+#' @return
+#'      integer vector that is a permutation of 1:n, where n is the number of
+#'      members in the pedigree
+#' @export
+ped.order <- function(ped.align) {
+    ord <- ped.align$nid[order(ped.align$pos)]
+    ord <- ord[ord > 0]
+    pedSize <- sum(ped.align$n)
+    if(length(ord) != pedSize || !setequal(ord, 1:pedSize))
+        stop("Internal error: pedOrder result is not a permutation")
+    return(ord)
+}
+
+#' Horizontal plot position of pedigree members
+#'
+#' This is a convenience function that returns a named numeric vector, where
+#' the names are the pedigree member identifiers and the values are the
+#' horizontal plotting coordinates.
+#'
+#' @inheritParams align.pedigree.1d
+#' @inheritParams ped.order
+#' @return
+#'      named numeric vector, giving the horizontal plot coordinates and named
+#'      with pedigree identifier
+#' @export
+ped.hpos <- function(ped, ped.align) {
+    i <- ped.align$nid > 0
+    hpos <- ped.align$pos[i]
+    names(hpos) <- as.character(ped$id[ped.align$nid[i]])
+    return(hpos)
+}
