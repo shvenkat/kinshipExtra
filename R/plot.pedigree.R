@@ -1,4 +1,21 @@
-# Automatically generated from all.nw using noweb
+#' Plot a pedigree with a choice of layout
+#'
+#' This function is identical to its namesake in kinship2, with the exception
+#' that it accepts an additional pedalign argument that can be used to specify
+#' alternative layouts.
+#'
+#' @param x
+#'      pedigree object, as returned by kinship2::pedigree
+#' @param id,status,affected,cex,col,symbolsize,branch,packed,align,width,density,mar,angle,keep.par,subregion,...
+#'      see kinship2::pedigree
+#' @param pedalign
+#'      pedigree alignment list, such as returned by alignped
+#' @return
+#'      see kinship2::pedigree
+#' @import kinship2
+#' @export
+#' @method plot pedigree
+#' @S3method plot pedigree
 plot.pedigree <- function(x, id = x$id, status = x$status,
                           affected = x$affected,
                           cex = 1, col = 1,
@@ -6,7 +23,7 @@ plot.pedigree <- function(x, id = x$id, status = x$status,
                           packed = TRUE, align = c(1.5,2), width = 8,
                           density=c(-1, 35,55,25), mar=c(4.1, 1, 4.1, 1),
                           angle=c(90,65,40,0), keep.par=FALSE,
-                          subregion, ped.align, ...)
+                          subregion, pedalign, ...)
 {
     # Checks
     Call <- match.call()
@@ -93,8 +110,8 @@ plot.pedigree <- function(x, id = x$id, status = x$status,
         if (!is.null(plist$twins)) out$twins <- twin2[, 1:n, drop=F]
         out
         }
-    if(!missing(ped.align))
-        plist <- ped.align
+    if(!missing(pedalign))
+        plist <- pedalign
     else
         plist <- align.pedigree(x, packed = packed, width = width, align = align)
     if (!missing(subregion)) plist <- subregion2(plist, subregion)

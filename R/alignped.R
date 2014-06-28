@@ -1,3 +1,37 @@
+#' Generate a pedigree layout for plotting
+#'
+#' This function provides convenient access to layout algorithms in this
+#' package as well as in kinship2.
+#'
+#' @inheritParams ggpedigree
+#' @param method
+#'      one of the strings "classic", "compact" and "1d"
+#' @return
+#'      pedigree alignment list, such as returned by kinship2::align.pedigree
+#' @section Details:
+#'      The layout methods available are: classic, compact and 1d. Classic
+#'      gives the common layout used in textbooks, with parents centered on
+#'      their children below. Compact generates a minimum-width layout, in
+#'      which parents may not be directly above their children, leading to the
+#'      use of diagonal descending connectors. 1d assigns non-overlapping
+#'      horizontal positions to pedigree members across generations, producing
+#'      a layout suitable for annotating the axis of another plot.
+#'
+#'      Note: In a 1d layout, each subtree of the pedigree is compact, in the
+#'      sense that no member outside that subtree occupies a position within
+#'      the interval spanned by the subtree.
+#' @import kinship2
+#' @export
+alignped <- function(ped, method = "classic") {
+    method <- match.arg(method, c("classic", "compact", "1d"))
+    pedalign <- switch(method,
+        "classic" = align.pedigree(ped, packed = FALSE, align = FALSE),
+        "compact" = align.pedigree(ped, packed = TRUE, align = TRUE),
+        "1d"      = align.pedigree.1d(ped),
+        stop(sprintf("%s is not a valid 'method'", method)))
+    return(pedalign)
+}
+
 #' Generate a "1-dimensional" layout of a pedigree
 #'
 #' Given a pedigree, this function returns a pedigree alignment that assigns
@@ -6,76 +40,32 @@
 #' This is useful in annotating a figure (e.g. haplotype sharing) where the
 #' same persons are plotted along one of the axes.
 #'
-#' @param ped
-#'     pedigree object, as returned by kinship2::pedigree
-#' @param method
-#'     string, one of 'compactsubtree' and 'preserveorder'
-#' @param ...
-#'     additional arguments passed to kinship2::align.pedigree
+#' In this alignment, each pedigree subtree is compact. A subtree of a pedigree
+#' comprises a person, their partner, descendants and descendants' partners.
+#' This layout generates compact subtrees, in that each one occupies a
+#' horizontal interval _exclusively_. In other words, no persons outside a
+#' subtree (e.g. ancestors, siblings, etc.) occupy the interval corresponding
+#' to it. This layout is the most "natural" looking 1d layout.
+#' @inheritParams alignped
 #' @return
-#'     list, as returned by kinship2::align.pedigree
+#'     pedigree alignment list, such as returned by kinship2::align.pedigree
 #' @import kinship2
-#' @export
-align.pedigree.1d <- function(ped, method = "compactsubtree", ...) {
+align.pedigree.1d <- function(ped) {
 
-    align.result <- align.pedigree(ped, ...)
-    pedheight <- length(align.result$n)
-    if(pedheight < 2)
-        return(align.result)
+    pedalign <- alignped(ped, method = "classic")
+    # If the pedigree has only one generation, no further work is needed
+    if(length(pedalign$n) < 2)
+        return(pedalign)
 
-    n <- align.result$n
-    nid <- align.result$nid
-    fam <- align.result$fam
-    spouse <- align.result$spouse
-    pos <- align.result$pos
+    n      <- pedalign$n
+    nid    <- pedalign$nid
+    fam    <- pedalign$fam
+    spouse <- pedalign$spouse
+    pos    <- pedalign$pos
+    pos[nid == 0] <- NA         # NA indicates an empty position
+    pos[!is.na(pos)] <- 0       # non-empty positions are zero-ed out
 
-    pos[nid == 0] <- NA
-    method <- match.arg(method, c("compactsubtree", "preserveorder"))
-    pos <- switch(method,
-        "compactsubtree" = align.pedigree.1d.compactsubtree(pos, n, nid, fam,
-            spouse, ped),
-        "preserveorder" = align.pedigree.1d.preserveorder(pos),
-        stop(sprintf("%s is not a valid 'method'", method)))
-    if(any(pos[!is.na(pos)] == 0))
-        warning("Some persons were not assigned positions, defaulting to zero")
-    pos[is.na(pos)] <- 0
-
-    align.result$pos <- pos
-    return(align.result)
-}
-
-#' Generate a 1d layout of a pedigree, preserving the original horizontal order
-#'
-#' @param pos
-#'     integer matrix, pos element from return value of kinship2::align.pedigree
-#' @return
-#'     integer matrix; updated pos element
-align.pedigree.1d.preserveorder <- function(pos) {
-    pos[!is.na(pos)] <- rank(pos[!is.na(pos)])
-    return(pos)
-}
-
-#' Generate a 1d layout of a pedigree where each subtree is compact
-#'
-#' A subtree of a pedigree comprises a person, their partner, descendants and
-#' descendants' partners. This layout generates compact subtrees, in that each
-#' one occupies a horizontal interval _exclusively_. In other words, no persons
-#' outside a subtree (e.g. ancestors, siblings, etc.) occupy the interval
-#' corresponding to it.
-#'
-#' This layout is the most "natural" looking 1d layout.
-#'
-#' @param pos,n,nid,fam,spouse
-#'     elements of the return value of kinship2::align.pedigree
-#' @param ped
-#'     pedigree object, as returned by kinship2::pedigree
-#' @return
-#'     integer matrix; updated pos element
-align.pedigree.1d.compactsubtree <- function(pos, n, nid, fam, spouse, ped) {
-
-    # NA indicates empty position; all non-empty positions are zero-ed out
-    pos[!is.na(pos)] <- 0
-    # Process levels one at a time, top-down
+    # Process levels one at a time top-down, updating layout positions
     for(i in 1:length(n)) {
         # Process each level left-to-right in extended sibships
         # A extended sibship is a set of full siblings with their partners.
@@ -153,7 +143,13 @@ align.pedigree.1d.compactsubtree <- function(pos, n, nid, fam, spouse, ped) {
             next
         }
     }
-    return(pos)
+
+    if(any(pos[!is.na(pos)] == 0))
+        warning("Some persons were not assigned positions, defaulting to zero")
+    pos[is.na(pos)] <- 0        # For consistency with kinship2::align.pedigree
+
+    pedalign$pos <- pos
+    return(pedalign)
 }
 
 #' Insert person(s) at the rightmost position of a given level
@@ -213,17 +209,16 @@ pedpos.insert.flanking <- function(pos, i, lxsibs, rxsibs, dad, mom) {
 #' \code{ped$id[pedOrder(x)]} gives the pedigree member identifiers in the same
 #' order as their horizontal position in pedigree alignment \code{x}.
 #'
-#' @param ped.align
-#'      pedigree alignment, as returned by align.pedigree.1d or
-#'      kinship2::align.pedigree
+#' @param pedalign
+#'      pedigree alignment, such as returned by alignped
 #' @return
 #'      integer vector that is a permutation of 1:n, where n is the number of
 #'      members in the pedigree
 #' @export
-ped.order <- function(ped.align) {
-    ord <- ped.align$nid[order(ped.align$pos)]
+ped.order <- function(pedalign) {
+    ord <- pedalign$nid[order(pedalign$pos)]
     ord <- ord[ord > 0]
-    pedSize <- sum(ped.align$n)
+    pedSize <- sum(pedalign$n)
     if(length(ord) != pedSize || !setequal(ord, 1:pedSize))
         stop("Internal error: pedOrder result is not a permutation")
     return(ord)
@@ -235,15 +230,15 @@ ped.order <- function(ped.align) {
 #' the names are the pedigree member identifiers and the values are the
 #' horizontal plotting coordinates.
 #'
-#' @inheritParams align.pedigree.1d
+#' @inheritParams alignped
 #' @inheritParams ped.order
 #' @return
 #'      named numeric vector, giving the horizontal plot coordinates and named
 #'      with pedigree identifier
 #' @export
-ped.hpos <- function(ped, ped.align) {
-    i <- ped.align$nid > 0
-    hpos <- ped.align$pos[i]
-    names(hpos) <- as.character(ped$id[ped.align$nid[i]])
+ped.hpos <- function(ped, pedalign) {
+    i <- pedalign$nid > 0
+    hpos <- pedalign$pos[i]
+    names(hpos) <- as.character(ped$id[pedalign$nid[i]])
     return(hpos)
 }

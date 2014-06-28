@@ -13,8 +13,7 @@
 #' @param ped
 #'      Pedigree object, as returned by kinship2::pedigree
 #' @param pedalign
-#'      (Optional) Pedigree alignment, as returned by align.pedigree.1d.
-#'      Defaults to value returned by kinship2::align.pedigree.
+#'      (Optional) Pedigree alignment list, defaults to alignped(ped)
 #' @param symbolfill,symbolborder,symbolsize,symbolalpha
 #'      (Optional) Factors or numeric vectors specifying the values of
 #'      qualitative or quantitative traits (or other variables) respectively.
@@ -76,7 +75,7 @@
 #'      library(ggplot2)
 #'      data(simpleped)
 #'      ggpedigree(ped1)
-#'      ggpedigree(ped1, align.pedigree.1d(ped1))
+#'      ggpedigree(ped1, alignped(ped1, method = "1d"))
 #'      ggpedigree(ped1, symbolfill = ped1$affected)
 #'      ggpedigree(ped1,
 #'          symbolfill = factor(c("unaffected", "affected")[ped1$affected + 1],
@@ -87,7 +86,7 @@
 #' @import kinship2 ggplot2 scales
 #' @export
 ggpedigree <- function(ped,
-        pedalign     = align.pedigree(ped),
+        pedalign     = alignped(ped),
         symbolfill,
         symbolborder = NULL,
         symbolsize   = NULL,
@@ -288,11 +287,11 @@ ggpedigree <- function(ped,
             color = "none",
             size  = "none",
             alpha = "none")
-        # guides(shape = guide_legend(title = NULL),
-        #     fill  = guide_legend(title = NULL, override.aes = list(shape = 22)),
-        #     color = guide_legend(title = NULL, override.aes = list(shape = 22)),
-        #     size  = guide_legend(title = NULL, override.aes = list(shape = 22)),
-        #     alpha = guide_legend(title = NULL, override.aes = list(shape = 22)))
+    # guides(shape = guide_legend(title = NULL),
+    #     fill  = guide_legend(title = NULL, override.aes = list(shape = 22)),
+    #     color = guide_legend(title = NULL, override.aes = list(shape = 22)),
+    #     size  = guide_legend(title = NULL, override.aes = list(shape = 22)),
+    #     alpha = guide_legend(title = NULL, override.aes = list(shape = 22)))
 
     return(plt)
 }
