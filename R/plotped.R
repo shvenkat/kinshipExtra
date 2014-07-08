@@ -1,6 +1,6 @@
 #' Plot a pedigree with a choice of layout
 #'
-#' This function is identical to its namesake in kinship2, with the exception
+#' This function is identical to kinship2::plot.pedigree, with the exception
 #' that it accepts an additional pedalign argument that can be used to specify
 #' alternative layouts.
 #'
@@ -14,9 +14,7 @@
 #'      see kinship2::pedigree
 #' @import kinship2
 #' @export
-#' @method plot pedigree
-#' @S3method plot pedigree
-plot.pedigree <- function(x, id = x$id, status = x$status,
+plotped <- function(x, id = x$id, status = x$status,
                           affected = x$affected,
                           cex = 1, col = 1,
                           symbolsize = 1, branch = 0.6,

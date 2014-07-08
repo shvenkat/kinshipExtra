@@ -27,7 +27,7 @@ alignped <- function(ped, method = "classic") {
     pedalign <- switch(method,
         "classic" = align.pedigree(ped, packed = FALSE, align = FALSE),
         "compact" = align.pedigree(ped, packed = TRUE, align = TRUE),
-        "1d"      = align.pedigree.1d(ped),
+        "1d"      = alignPedigree1D(ped),
         stop(sprintf("%s is not a valid 'method'", method)))
     return(pedalign)
 }
@@ -50,7 +50,7 @@ alignped <- function(ped, method = "classic") {
 #' @return
 #'     pedigree alignment list, such as returned by kinship2::align.pedigree
 #' @import kinship2
-align.pedigree.1d <- function(ped) {
+alignPedigree1D <- function(ped) {
 
     pedalign <- alignped(ped, method = "classic")
     # If the pedigree has only one generation, no further work is needed
@@ -93,7 +93,7 @@ align.pedigree.1d <- function(ped) {
             # Pair of founders, insert them at the rightmost position of the
             # current level.
             if(fam[i, j] == 0 && fam[i, j + 1] == 0) {
-                pos <- pedpos.insert.right(pos, i, c(j, j + 1))
+                pos <- pedigreePosInsertRight(pos, i, c(j, j + 1))
                 j <- j + 2
                 next
             }
@@ -138,7 +138,7 @@ align.pedigree.1d <- function(ped) {
                             "= (%i, %i, %i, %i, %i, %i, %i)"),
                         i, j, k, min(sibs), max(sibs), dad, mom))
 
-            pos <- pedpos.insert.flanking(pos, i, lxsibs, rxsibs, dad, mom)
+            pos <- pedigreePosInsertFlanking(pos, i, lxsibs, rxsibs, dad, mom)
             j <- k + 1
             next
         }
@@ -162,7 +162,7 @@ align.pedigree.1d <- function(ped) {
 #'     person(s) to insert, col(s) of pos
 #' @return
 #'     updated pos matrix
-pedpos.insert.right <- function(pos, i, js) {
+pedigreePosInsertRight <- function(pos, i, js) {
     nj <- length(js)
     m <- max(pos[i, ], na.rm = TRUE)
     pos[!is.na(pos) & pos > m] <- pos[!is.na(pos) & pos > m] + nj
@@ -186,7 +186,7 @@ pedpos.insert.right <- function(pos, i, js) {
 #'     parents on level i - 1, col(s) of pos
 #' @return
 #'     updated pos matrix
-pedpos.insert.flanking <- function(pos, i, lxsibs, rxsibs, dad, mom) {
+pedigreePosInsertFlanking <- function(pos, i, lxsibs, rxsibs, dad, mom) {
     lparent <- min(dad, mom)
     rparent <- max(dad, mom)
     poslparent <- pos[i - 1, lparent]
@@ -206,7 +206,7 @@ pedpos.insert.flanking <- function(pos, i, lxsibs, rxsibs, dad, mom) {
 #'
 #' This function returns a permutation that orders the members of a pedigree
 #' according to their horizontal plot position. In other words,
-#' \code{ped$id[pedOrder(x)]} gives the pedigree member identifiers in the same
+#' \code{ped$id[orderped(x)]} gives the pedigree member identifiers in the same
 #' order as their horizontal position in pedigree alignment \code{x}.
 #'
 #' @param pedalign
@@ -215,7 +215,7 @@ pedpos.insert.flanking <- function(pos, i, lxsibs, rxsibs, dad, mom) {
 #'      integer vector that is a permutation of 1:n, where n is the number of
 #'      members in the pedigree
 #' @export
-ped.order <- function(pedalign) {
+orderped <- function(pedalign) {
     ord <- pedalign$nid[order(pedalign$pos)]
     ord <- ord[ord > 0]
     pedSize <- sum(pedalign$n)
@@ -231,12 +231,12 @@ ped.order <- function(pedalign) {
 #' horizontal plotting coordinates.
 #'
 #' @inheritParams alignped
-#' @inheritParams ped.order
+#' @inheritParams orderped
 #' @return
 #'      named numeric vector, giving the horizontal plot coordinates and named
 #'      with pedigree identifier
 #' @export
-ped.hpos <- function(ped, pedalign) {
+hposped <- function(ped, pedalign) {
     i <- pedalign$nid > 0
     hpos <- pedalign$pos[i]
     names(hpos) <- as.character(ped$id[pedalign$nid[i]])
