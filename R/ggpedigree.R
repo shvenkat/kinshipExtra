@@ -166,7 +166,7 @@ ggpedigree <- function(ped,
 
     # BUILD PLOT ##############################################################
     plt <- ggplot() +
-        theme(
+        theme(panel.background = element_rect(fill = bgcolor),
             panel.grid = element_blank(),
             axis.title = element_blank(),
             axis.text  = element_blank(),
@@ -260,8 +260,11 @@ ggpedigree <- function(ped,
 
     # Set the scale for ggplot aesthetics
     plt <- plt +
-        scale_x_continuous(expand = c(0.1, 0.1)) +
-        scale_y_continuous(expand = c(0.1, 0.1), trans = reverse_trans()) +
+        scale_x_continuous() +
+        scale_y_continuous(trans = reverse_trans(),
+                           limits = rev(range(symbolData$y) +
+                                        c(-0.3, 0.3 + 0.2 * labelsize)
+                                        * 0.1 * mean(symbolData$size))) +
         scale_shape_identity() +
         switch(is.factor(symbolAttrs$fill),
             "TRUE"  = scale_fill_manual(values = attrValues$fill),
