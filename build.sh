@@ -11,14 +11,18 @@ if [[ ! -f "DESCRIPTION" ]]; then
 fi
 
 echo -n "Building package documentation ... "
-R --slave -e 'library(roxygen2); roxygenize(clean = TRUE)' 1>&2 \
-  && echo "done" || { echo "failed"; exit 1; }
+R --slave <<-EOF 1>&2 && echo "done" || { echo "failed"; exit 1; }
+    suppressPackageStartupMessages(library(roxygen2))
+    roxygenize(clean = TRUE)
+EOF
 if [[ $(uname -s) =~ "CYGWIN" ]]; then
     echo "Detected Cygwin environment, applying charset fix"
     sed -e 's/\xc2\xa0/ /g' -i man/*.Rd
 fi
 echo -n "Building package tarball ... "
-R --slave -e 'library(devtools); build()' 1>&2 \
-  && echo "done" || { echo "failed"; exit 1; }
+R --slave <<-EOF 1>&2 && echo "done" || { echo "failed"; exit 1; }
+    suppressPackageStartupMessages(library(devtools))
+    build()
+EOF
 echo "See parent directory for package tarball." \
     "Install using R CMD INSTALL."
