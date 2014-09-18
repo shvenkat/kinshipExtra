@@ -30,12 +30,19 @@
 #'      the corresponding factor levels. For numeric variables, specify the
 #'      high and low attribute values. Default values are provided, except for
 #'      factors with more than 3 levels.
+#' @param fillkey,borderkey,sizekey,alphakey
+#'      (Optional) String value to modify the appearance of a symbol attribute
+#'      key. NULL (the default) returns no key, "" returns an untitled key and
+#'      any other string is used as the key title.
 #' @param labeltext
 #'      (Optional) Character vector of labels to be printed below the symbols
 #'      in addition to ped$id.
 #' @param labelsize
 #'      (Optional) Label size multiplier, default 1. Use 0 to avoid labeling
 #'      symbols.
+#' @param labeloffset
+#'      (Optional) Label offset value, default 0. Used to adjust vertical space
+#'      between symbols and labels.
 #' @param bgcolor
 #'      (Optional) Plot background color, default "gray90" i.e. light gray
 #' @return
@@ -51,10 +58,10 @@
 #'      unaffected and affected, per the kinship2 documentation.
 #'
 #'      To maintain readability,
-#'      * minimize the number of distinct attribute values in each variable
-#'      * avoid using a hue-based scale for more than one attribute
-#'      * use a large size range when specifying sizevalues
-#'      * avoid using transparency to indicate more than two values
+#'      * minimize the number of distinct attribute values in each variable,
+#'      * avoid using a hue-based scale for more than one attribute,
+#'      * use a large size range when specifying sizevalues, and
+#'      * avoid using transparency to indicate more than two values.
 #'
 #'      For qualitative/categorical variables as symbol.. arguments, use
 #'      factors instead of logical, integer and character vectors for two
@@ -68,8 +75,8 @@
 #'      a ggplot scale to the return value of ggpedigree. For instance,
 #'      \code{ggpedigree(...) + scale_fill_gradient(..., na.value = "gray50")}.
 #'
-#'      To fine tune the result, add the appropriate ggplot theme or legend
-#'      option to the return value.
+#'      To fine tune the result, try adding the appropriate ggplot theme or
+#'      legend option to the return value. Such use has not been tested.
 #' @examples
 #'      library(kinship2)
 #'      library(ggplot2)
@@ -86,20 +93,17 @@
 #' @import kinship2 ggplot2 scales
 #' @export
 ggpedigree <- function(ped,
-        pedalign     = alignped(ped),
-        symbolfill,
-        symbolborder = NULL,
-        symbolsize   = NULL,
-        symbolalpha  = NULL,
-        fillvalues   = NULL,
-        bordervalues = NULL,
-        sizevalues   = NULL,
-        alphavalues  = NULL,
-        labeltext    = NULL,
-        labelsize    = 1,
-        bgcolor      = "gray90") {
+                       pedalign = alignped(ped),
+                       symbolfill,        symbolborder = NULL,
+                       symbolsize = NULL, symbolalpha  = NULL,
+                       fillvalues = NULL, bordervalues = NULL,
+                       sizevalues = NULL, alphavalues  = NULL,
+                       fillkey    = NULL, borderkey    = NULL,
+                       sizekey    = NULL, alphakey     = NULL,
+                       labeltext  = NULL, labelsize    = 1,
+                       labeloffset = 0,   bgcolor      = "gray90") {
 
-    # CHECK ARGUMENTS #########################################################
+    # CHECK ARGUMENTS -------------------------------------------------------
 
     # Pedigree alignment should match pedigree
     if(!setequal(seq_along(ped$id), pedalign$nid[pedalign$nid != 0]))
@@ -116,185 +120,213 @@ ggpedigree <- function(ped,
                 symbolfill <- ped$affected
             traitValues <- c("unaffected", "affected")
             symbolfill <- factor(traitValues[symbolfill + 1],
-                    levels = traitValues)
+                                 levels = traitValues)
         }
     }
-    symbolAttrs <- list(
-        "shape"  = ped$sex,
-        "fill"   = symbolfill,
-        "border" = symbolborder,
-        "size"   = symbolsize,
-        "alpha"  = symbolalpha)
-    # Hide legend key for unused (NULL-valued) symbol attributes
+
+    symbolAttrs <- list("shape"  = ped$sex,
+                        "fill"   = symbolfill, "border" = symbolborder,
+                        "size"   = symbolsize, "alpha"  = symbolalpha)
     symbolAttrWasNull <- lapply(symbolAttrs, is.null)
     symbolAttrs <- validSymbolAttrs(symbolAttrs, length(ped$id))
 
-    attrValues <- list(
-        "shape"  = c("male" = 1, "female" = 2, "unknown" = 3, "terminated" = 4),
-        "fill"   = fillvalues,
-        "border" = bordervalues,
-        "size"   = sizevalues,
-        "alpha"  = alphavalues)
-    attrValueWasNull <- lapply(attrValues, is.null)
+    attrValues <- list("shape"  = c("male" = 1, "female" = 2,
+                                    "unknown" = 3, "terminated" = 4),
+                       "fill"   = fillvalues, "border" = bordervalues,
+                       "size"   = sizevalues, "alpha"  = alphavalues)
+    # attrValueWasNull <- lapply(attrValues, is.null)
     attrValues <- validAttrValues(attrValues, symbolAttrs, bgcolor)
+
+    attrKeys <- list("shape"  = NULL,
+                     "fill"   = fillkey,  "border" = borderkey,
+                     "size"   = sizekey,  "alpha"  = alphakey)
+    attrKeys <- validAttrKeys(attrKeys, symbolAttrWasNull)
 
     if(!is.null(labeltext)) {
         if(!is.character(labeltext) || length(labeltext) != length(ped$id))
             stop(paste("labeltext must be a character vector of the same",
-                    "length as ped$id"))
+                       "length as ped$id"))
     }
-    if(!is.numeric(labelsize) || length(labelsize) != 1 || !is.finite(labelsize)
-        || labelsize < 0)
+    if(!is.numeric(labelsize) || length(labelsize) != 1 ||
+       !is.finite(labelsize) || labelsize < 0)
         stop("'labelsize' must be a single positive finite numeric value")
 
-    # GENERATE PLOTTING DATA ##################################################
+    if(!is.numeric(labeloffset) || length(labeloffset) != 1 ||
+       !is.finite(labeloffset))
+        stop("'labeloffset' must be a single finite numeric value")
 
-    # Special handling of shape and size is needed due to the non-uniform
-    # apparent size of the standard plotting symbol shapes
+    # GENERATE PLOTTING DATA ------------------------------------------------
+
+    # Prepare to tweak symbol size when building the plot so that different
+    # shapes appear similar in size
     symbolAttrs <- within(symbolAttrs, {
         shape <- attrValues$shape[as.character(shape)]
-        size  <- switch(is.numeric(size),
-                "TRUE"  = scaleMinMax(size,
-                    attrValues$size["low"],
-                    attrValues$size["high"]),
-                "FALSE" = attrValues$size[as.character(size)])
+        size  <- switch(ifelse(is.numeric(size), 1, 2),
+                        scaleMinMax(size,
+                                    attrValues$size["low"],
+                                    attrValues$size["high"]),
+                        attrValues$size[as.character(size)])
     })
     relationData <- getRelationData(ped, pedalign)
     symbolData   <- getSymbolData(ped, pedalign, symbolAttrs)
     statusData   <- getStatusData(ped, symbolData)
-    labelData    <- getLabelData(symbolData, labeltext, labelsize)
+    labelData    <- getLabelData(symbolData, labeltext, labelsize, labeloffset)
 
-    # BUILD PLOT ##############################################################
+    # BUILD PLOT ------------------------------------------------------------
+
+    # Many ggplot layers are required to generate the desired plot. Symbols,
+    # line segments and text labels are plotted on separate layers. In
+    # addition, symbol fill and border are on separate layers. Only appropriate
+    # layers contribute to the plot legend/key. Mock layers are used either for
+    # their contribution to the legend or to mask certain elements from layers
+    # below.
+
+    # To minimize differences in the apparent size of various symbol shapes,
+    # the shape and size are transformed prior to being passed as ggplot
+    # aesthetics. The integer shape values 1-4 are mapped to integer codes for
+    # plot symbols. Size values are adjusted by a shape-dependent value.
+
+    # Base plot and theme
     plt <- ggplot() +
-        theme(panel.background = element_rect(fill = bgcolor),
-            panel.grid = element_blank(),
-            axis.title = element_blank(),
-            axis.text  = element_blank(),
-            axis.ticks = element_blank(),
-            axis.line  = element_blank())
+           theme(panel.background = element_rect(fill = bgcolor),
+                 panel.grid = element_blank(),
+                 axis.title = element_blank(),
+                 axis.text  = element_blank(),
+                 axis.ticks = element_blank(),
+                 axis.line  = element_blank())
+
+    # Add a fully transparent mock layer to get a border key with lines
+    plt <- plt +
+           geom_line(data = symbolData,
+                     mapping = aes(x = x, y = y, color = border),
+                     size = 3, alpha = 0, linetype = 1)
 
     # Plot symbol borders first so they appear UNDER relationship lines
     plt <- plt +
-        geom_point(                # symbol border
-            data    = symbolData,
-            mapping = aes(
-                x     = x,
-                y     = y,
-                shape = as.integer(c(15, 16, 18, 17)[shape]),
-                color = border,
-                size  = as.numeric(size * c(1.25, 1.4, 1.46, 1.02)[shape]),
-                alpha = alpha)) +
-        geom_point(                # spacer
-            data    = symbolData,
-            mapping = aes(
-                x     = x,
-                y     = y,
-                shape = as.integer(c(15, 16, 18, 17)[shape]),
-                size  = as.numeric(size * c(1.05, 1.2, 1.26, 0.82)[shape]),
-                alpha = alpha),
-            color   = bgcolor)
+           geom_point(data = symbolData,       # symbol border
+                      mapping = aes(x     = x,
+                                    y     = y,
+                                    shape = as.integer(c(15, 16, 18, 17)[shape]),
+                                    color = border,
+                                    size  = as.numeric(size * c(1.25, 1.4, 1.46, 1.02)[shape]),
+                                    alpha = alpha),
+                      show_guide = FALSE) +
+           geom_point(data = symbolData,       # spacer between border and fill
+                      mapping = aes(x     = x,
+                                    y     = y,
+                                    shape = as.integer(c(15, 16, 18, 17)[shape]),
+                                    size  = as.numeric(size * c(1.05, 1.2, 1.26, 0.82)[shape]),
+                                    alpha = alpha),
+                      color = bgcolor,
+                      show_guide = FALSE)
 
     # Plot line segments showing relationships
     plt <- plt +
-        geom_segment(
-            data    = relationData,
-            mapping = aes(
-                x     = x,
-                xend  = xend,
-                y     = y,
-                yend  = yend),
-            alpha   = 1,
-            color   = "gray20")
+           geom_segment(data = relationData,
+                        mapping = aes(x     = x,
+                                      xend  = xend,
+                                      y     = y,
+                                      yend  = yend),
+                        alpha = 1,
+                        color = "gray20",
+                        show_guide = FALSE)
 
     # Plot symbols showing individuals
     plt <- plt +
-        geom_point(                # cover up relationship lines under symbols
-            data    = symbolData,
-            mapping = aes(
-                x     = x,
-                y     = y,
-                shape = as.integer(c(22, 21, 23, 24)[shape]),
-                size  = as.numeric(size * c(1, 1, 0.8, 0.6)[shape])),
-            fill    = bgcolor,
-            color   = bgcolor,
-            alpha   = 1) +
-        geom_point(                # symbol fill and outline
-            data    = symbolData,
-            mapping = aes(
-                x     = x,
-                y     = y,
-                shape = as.integer(c(22, 21, 23, 24)[shape]),
-                fill  = fill,
-                size  = as.numeric(size * c(1, 1, 0.8, 0.6)[shape]),
-                alpha = alpha),
-            color = "gray20")
+           geom_point(data = symbolData,       # mask lines under symbols
+                      mapping = aes(x     = x,
+                                    y     = y,
+                                    shape = as.integer(c(22, 21, 23, 24)[shape]),
+                                    size  = as.numeric(size * c(1, 1, 0.8, 0.6)[shape])),
+                      fill = bgcolor,
+                      color = bgcolor,
+                      alpha = 1,
+                      show_guide = FALSE) +
+           geom_point(data = symbolData,       # symbol fill and outline
+                      mapping = aes(x     = x,
+                                    y     = y,
+                                    shape = as.integer(c(22, 21, 23, 24)[shape]),
+                                    fill  = fill,
+                                    size  = as.numeric(size * c(1, 1, 0.8, 0.6)[shape]),
+                                    alpha = alpha),
+                      color = "gray20")
 
     # Plot line segments showing status (alive/censored or deceased)
     if(nrow(statusData) > 0) {
         plt <- plt +
-            geom_segment(
-                data    = statusData,
-                mapping = aes(
-                    x     = x,
-                    xend  = xend,
-                    y     = y,
-                    yend  = yend,
-                    alpha = alpha),
-                color   = "gray20")
+               geom_segment(data = statusData,
+                            mapping = aes(x     = x,
+                                          xend  = xend,
+                                          y     = y,
+                                          yend  = yend,
+                                          alpha = alpha),
+                            color = "gray20",
+                            show_guide = FALSE)
     }
 
     # Plot text labels under symbols
     plt <- plt +
-        geom_text(
-            data    = labelData,
-            mapping = aes(
-                x     = x,
-                y     = y,
-                vjust = vjust,
-                label = label,
-                size  = size,
-                alpha = alpha),
-            color   = "black",
-            hjust   = 0.5)
-            # vjust   = 1)
+           geom_text(data    = labelData,
+                     mapping = aes(x     = x,
+                                   y     = y,
+                                   vjust = vjust,
+                                   label = label,
+                                   size  = size,
+                                   alpha = alpha),
+                     color   = "black",
+                     hjust   = 0.5,
+                     show_guide = FALSE)
 
     # Set the scale for ggplot aesthetics
     plt <- plt +
-        scale_x_continuous() +
-        scale_y_continuous(trans = reverse_trans(),
-                           limits = rev(range(symbolData$y) +
-                                        c(-0.3, 0.3 + 0.2 * labelsize)
-                                        * 0.1 * mean(symbolData$size))) +
-        scale_shape_identity() +
-        switch(is.factor(symbolAttrs$fill),
-            "TRUE"  = scale_fill_manual(values = attrValues$fill),
-            "FALSE" = scale_fill_gradient(
-                low  = attrValues$fill["low"],
-                high = attrValues$fill["high"])) +
-        switch(is.factor(symbolAttrs$border),
-            "TRUE"  = scale_color_manual(values = attrValues$border),
-            "FALSE" = scale_color_gradient(
-                low  = attrValues$border["low"],
-                high = attrValues$border["high"])) +
-        scale_size_identity() +
-        switch(is.factor(symbolAttrs$alpha),
-            "TRUE"  = scale_alpha_manual(values = attrValues$alpha),
-            "FALSE" = scale_alpha_continuous(range = c(
-                    low  = attrValues$alpha["low"],
-                    high = attrValues$alpha["high"])))
+           scale_x_continuous(limits = range(symbolData$x)
+                                       + c(-0.2, 0.2)
+                                       * 0.1 * mean(symbolData$size)) +
+           scale_y_continuous(trans = reverse_trans(),
+                              limits = rev(range(symbolData$y)
+                                           + c(-0.4, 0.2 + 0.4 * labelsize)  # Accomodate text labels
+                                           * 0.1 * mean(symbolData$size))) + # Scale to symbol size
+           scale_shape_identity() +
+           switch(ifelse(is.factor(symbolAttrs$fill), 1, 2),
+                  scale_fill_manual(values = attrValues$fill),
+                  scale_fill_gradient(low  = attrValues$fill["low"],
+                                      high = attrValues$fill["high"])) +
+           switch(ifelse(is.factor(symbolAttrs$border), 1, 2),
+                  scale_color_manual(values = attrValues$border),
+                  scale_color_gradient(low  = attrValues$border["low"],
+                                       high = attrValues$border["high"])) +
+           scale_size_identity(guide = "legend") +
+           switch(ifelse(is.factor(symbolAttrs$alpha), 1, 2),
+                  scale_alpha_manual(values = attrValues$alpha),
+                  scale_alpha_continuous(range = c(low  = attrValues$alpha["low"],
+                                                   high = attrValues$alpha["high"])))
 
-    # Plot legend
-    plt <- plt + guides(
-            shape = "none",
-            fill  = "none",
-            color = "none",
-            size  = "none",
-            alpha = "none")
-    # guides(shape = guide_legend(title = NULL),
-    #     fill  = guide_legend(title = NULL, override.aes = list(shape = 22)),
-    #     color = guide_legend(title = NULL, override.aes = list(shape = 22)),
-    #     size  = guide_legend(title = NULL, override.aes = list(shape = 22)),
-    #     alpha = guide_legend(title = NULL, override.aes = list(shape = 22)))
+    # Add legend matching symbol attributes
+    gds <- list(shape = guide_legend(title = attrKeys$shape,
+                                     order = 1),
+                fill  = guide_legend(title = attrKeys$fill,
+                                     override.aes = list(shape = 21,
+                                                         size = mean(symbolAttrs$size)/2),
+                                     order = 2),
+                color = guide_legend(title = attrKeys$border,
+                                     override.aes = list(size = 1, alpha = 1),
+                                     order = 3),
+                size  = guide_legend(title = attrKeys$size,
+                                     override.aes = list(shape = 21),
+                                     order = 4),
+                alpha = guide_legend(title = attrKeys$alpha,
+                                     override.aes = list(shape = 21,
+                                                         size = mean(symbolAttrs$size)/2),
+                                     order = 5))
+    if(!is.null(attrKeys$shape)  && is.na(attrKeys$shape))  gds$shape <- FALSE
+    if(!is.null(attrKeys$fill)   && is.na(attrKeys$fill))   gds$fill  <- FALSE
+    if(!is.null(attrKeys$border) && is.na(attrKeys$border)) gds$color <- FALSE
+    if(!is.null(attrKeys$size)   && is.na(attrKeys$size))   gds$size  <- FALSE
+    if(!is.null(attrKeys$alpha)  && is.na(attrKeys$alpha))  gds$alpha <- FALSE
+    plt <- plt +
+           do.call(guides, gds) +
+           theme(legend.key = element_rect(fill = bgcolor),
+                 legend.position = "right")
 
     return(plt)
 }
@@ -313,16 +345,18 @@ validSymbolAttrs <- function(symbolAttrs, n) {
     attrNames <- names(symbolAttrs)
     names(attrNames) <- attrNames
     # Assign mock default values to unused (NULL-valued) symbol attributes
-    symbolAttrs <- lapply(attrNames, function(name) {
-            if(is.null(symbolAttrs[[name]]))
-                return(defaultSymbolAttr(name, n))
-            else
-                return(symbolAttrs[[name]])
-        })
+    symbolAttrs <- lapply(attrNames,
+                          function(name) {
+                              if(is.null(symbolAttrs[[name]]))
+                                  return(defaultSymbolAttr(name, n))
+                              else
+                                  return(symbolAttrs[[name]])
+                          })
     # Check that attributes are valid
-    symbolAttrs <- lapply(attrNames, function(name) {
-        checkSymbolAttr(symbolAttrs[[name]], n, name)
-        })
+    symbolAttrs <- lapply(attrNames,
+                          function(name) {
+                              checkSymbolAttr(symbolAttrs[[name]], n, name)
+                          })
     return(symbolAttrs)
 }
 
@@ -336,15 +370,16 @@ validSymbolAttrs <- function(symbolAttrs, n) {
 #'      for symbol{shape,fill,border,size,alpha}
 defaultSymbolAttr <- function(name, n) {
     defaultAttr <- switch(name,
-        "shape"  = factor(rep("male", n)),
-        "fill"   = factor(rep("unaffected", n)),
-        "border" = factor(rep("default", n)),
-        "size"   = as.numeric(rep(1, n)),
-        "alpha"  = factor(rep("default", n)),
-        stop(sprintf(paste("Internal error: '%s' is an invalid 'name'",
-                    "argument; must be one of:",
-                    "shape, fill, border, size, and alpha"),
-                name)))
+                          "shape"  = factor(rep("male", n)),
+                          "fill"   = factor(rep("unaffected", n)),
+                          "border" = factor(rep("default", n)),
+                          "size"   = as.numeric(rep(1, n)),
+                          "alpha"  = factor(rep("default", n)),
+                          stop(sprintf(paste("Internal error: '%s' is an",
+                                             "invalid 'name' argument; must",
+                                             "be one of: shape, fill, border",
+                                             "size, and alpha"),
+                                       name)))
     return(defaultAttr)
 }
 
@@ -358,20 +393,20 @@ defaultSymbolAttr <- function(name, n) {
 #'      Factor or numeric vector of length n
 checkSymbolAttr <- function(symbolAttr, n, name) {
     symbolAttr <- switch(class(symbolAttr),
-        "factor"    = symbolAttr,
-        "numeric"   = symbolAttr,
-        "character" = factor(symbolAttr),
-        "logical"   = factor(symbolAttr),
-        "integer"   = factor(symbolAttr),
-        stop(sprintf(paste("symbol%s must be a vector of type factor or,",
-                    "numeric (or character, logical or integer)"),
-                name)))
+                         "factor"    = symbolAttr,
+                         "numeric"   = symbolAttr,
+                         "character" = factor(symbolAttr),
+                         "logical"   = factor(symbolAttr),
+                         "integer"   = factor(symbolAttr),
+                         stop(sprintf(paste("symbol%s must be a vector of",
+                                            "type factor or numeric (or",
+                                            "character, logical or integer)"),
+                                      name)))
     if(length(symbolAttr) != n)
-        stop(sprintf("symbol%s has length that does not match 'ped'",
-                name))
+        stop(sprintf("symbol%s has length that does not match 'ped'", name))
     # if(any(is.na(symbolAttr)))
     #     stop(sprintf("%s: %s has NA(s), not allowed",
-    #             msgPrefix, symbolAttr))
+    #                  msgPrefix, symbolAttr))
     return(symbolAttr)
 }
 
@@ -389,15 +424,20 @@ checkSymbolAttr <- function(symbolAttr, n, name) {
 validAttrValues <- function(attrValues, symbolAttrs, bgColor) {
     attrNames <- names(symbolAttrs)
     names(attrNames) <- attrNames
-    attrValues <- lapply(attrNames, function(name) {
-            if(is.null(attrValues[[name]]))
-                return(defaultAttrValue(name, symbolAttrs[[name]], bgColor))
-            else
-                return(attrValues[[name]])
-        })
-    attrValues <- lapply(attrNames, function(name) {
-        checkAttrValue(attrValues[[name]], symbolAttrs[[name]], name)
-    })
+    attrValues <- lapply(attrNames,
+                         function(name) {
+                             if(is.null(attrValues[[name]]))
+                                 return(defaultAttrValue(name,
+                                                         symbolAttrs[[name]],
+                                                         bgColor))
+                             else
+                                 return(attrValues[[name]])
+                         })
+    attrValues <- lapply(attrNames,
+                         function(name) {
+                             checkAttrValue(attrValues[[name]],
+                                            symbolAttrs[[name]], name)
+                         })
     return(attrValues)
 }
 
@@ -415,40 +455,43 @@ defaultAttrValue <- function(name, symbolAttr, bgColor) {
     if(is.factor(symbolAttr)) {
         if(nlevels(symbolAttr) > 3)
             stop(sprintf(paste("'symbol%s' argument has more than 3 levels.",
-                        "Specify '%svalues'"), name, name))
+                               "Specify '%svalues'"),
+                         name, name))
         attrValue <- switch(name,
-            "fill"   = switch(nlevels(symbolAttr),
-                        c("white"),
-                        c("white", "gray25"),
-                        c("white", "gray65", "gray25")),
-            "border" = switch(nlevels(symbolAttr),
-                        c(bgColor),
-                        c(bgColor, "#C66E00"),
-                        c(bgColor, "#009DCF", "#C66E00")),
-            "size"   = c(1, 2, 3)[1:nlevels(symbolAttr)],
-            "alpha"  = switch(nlevels(symbolAttr),
-                        c(1),
-                        c(1, 0.2),
-                        c(1, 0.6, 0.2)),
-            stop(sprintf(paste("Internal error: '%s' is an invalid 'name'",
-                        "argument; must be one of:",
-                        "shape, fill, border, size, and alpha"),
-                    name)))
+                            "fill"   = switch(nlevels(symbolAttr),
+                                              c("white"),
+                                              c("white", "gray25"),
+                                              c("white", "gray65", "gray25")),
+                            "border" = switch(nlevels(symbolAttr),
+                                              c(bgColor),
+                                              c(bgColor, "#C66E00"),
+                                              c(bgColor, "#009DCF", "#C66E00")),
+                            "size"   = c(1, 2, 3)[1:nlevels(symbolAttr)],
+                            "alpha"  = switch(nlevels(symbolAttr),
+                                              c(1),
+                                              c(1, 0.2),
+                                              c(1, 0.6, 0.2)),
+                            stop(sprintf(paste("Internal error: '%s' is an",
+                                               "invalid 'name' argument; must",
+                                               "be one of: shape, fill,",
+                                               "border, size, and alpha"),
+                                         name)))
         names(attrValue) <- levels(symbolAttr)
     } else if(is.numeric(symbolAttr)) {
         attrValue <- switch(name,
-            "fill"   = c(low = "white",   high = "black"),
-            "border" = c(low = "#fee5d9", high = "#a50f15"),
-            "size"   = c(low = 3,         high = 15),
-            "alpha"  = c(low = 0.2,       high = 1),
-            stop(sprintf(paste("Internal error: '%s' is an invalid 'name'",
-                        "argument; must be one of:",
-                        "shape, fill, border, size, and alpha"),
-                    name)))
+                            "fill"   = c(low = "white",   high = "black"),
+                            "border" = c(low = "#fee5d9", high = "#a50f15"),
+                            "size"   = c(low = 3,         high = 15),
+                            "alpha"  = c(low = 0.2,       high = 1),
+                            stop(sprintf(paste("Internal error: '%s' is an",
+                                               "invalid 'name' argument; must",
+                                               "be one of: shape, fill,",
+                                               "border, size, and alpha"),
+                                         name)))
     } else {
         stop(sprintf(paste("Internal error: symbolAttr is neither a factor",
-                    "nor a numeric vector, but a", class(symbolAttr)),
-                name))
+                           "nor a numeric vector, but a", class(symbolAttr)),
+                     name))
     }
     return(attrValue)
 }
@@ -466,12 +509,13 @@ checkAttrValue <- function(attrValue, symbolAttr, name) {
             if(all(levels(symbolAttr) %in% names(attrValue))) {
                 attrValue <- attrValue[levels(symbolAttr)]
             } else if(is.null(names(attrValue)) &&
-                length(attrValue) == nlevels(symbolAttr)) {
+                      length(attrValue) == nlevels(symbolAttr)) {
                 names(attrValue) <- levels(symbolAttr)
             } else {
-                stop(sprintf(paste("%svalues must be a named vector,",
-                        "with values for each level of the factor symbol%s"),
-                    name, name))
+                stop(sprintf(paste("%svalues must be a named vector, with",
+                                   "values for each level of the factor",
+                                   "symbol%s"),
+                             name, name))
             }
         }
     } else if (is.numeric(symbolAttr)) {
@@ -482,13 +526,15 @@ checkAttrValue <- function(attrValue, symbolAttr, name) {
                 names(attrValue) <- c("low", "high")
             } else {
                 stop(sprintf(paste("%svalues must be a named vector with",
-                            "values named 'low' and 'high' to scale symbol%s"),
-                        name, name))
+                                   "values named 'low' and 'high' to scale",
+                                   "symbol%s"),
+                             name, name))
             }
         }
     } else {
         stop(sprintf(paste("Internal error: symbol%s must be a factor or",
-                    "numeric vector"), name))
+                           "numeric vector"),
+                     name))
     }
     # fill and border values take multiple valid formats e.g. "blue", "#aabbcc"
     # size and alpha values must be numeric
@@ -498,6 +544,37 @@ checkAttrValue <- function(attrValue, symbolAttr, name) {
         }
     }
     return(attrValue)
+}
+
+#' Return valid attribute key modifiers
+#'
+#' @param attrKeys
+#'      Named list of attribute keys, with elements shape, fill, border, size
+#'      and alpha
+#' @inheritParams validSymbolAttrs
+#' @return
+#'      Named list of attribute keys
+validAttrKeys <- function(attrKeys, symbolAttrs) {
+    if(!setequal(names(attrKeys), names(symbolAttrs)))
+        stop("Internal error: invalid attrKeys")
+    attrNames <- names(attrKeys)
+    names(attrNames) <- attrNames
+    attrKeys <- lapply(attrNames,
+                       function(x) {
+                           y <- attrKeys[[x]]
+                           if(is.null(symbolAttrs[[x]]) || is.null(y))
+                               return(NA_character_)
+                           else if((is.character(y) && length(y) == 1))
+                               if(nchar(y) == 0)
+                                   return(NULL)
+                               else
+                                   return(y)
+                           else
+                               stop(sprintf(paste("%skey must be a single",
+                                                  "string value or NULL"),
+                                            x))
+                        })
+    return(attrKeys)
 }
 
 #' Scale linearly between two bounds
@@ -551,11 +628,12 @@ getRelationData <- function(ped, pedalign) {
                         list(c(xmparent, xmparent, i-1, i-0.5)))
                     for(k in js) {
                         segmts <- append(segmts,
-                            list(c(pos[i, k], pos[i, k], i, i-0.5)))
+                                         list(c(pos[i, k], pos[i, k],
+                                                i, i-0.5)))
                     }
                     segmts <- append(segmts,
                         list(c(min(xmin, xmparent), max(xmax, xmparent),
-                            i-0.5, i-0.5)))
+                               i-0.5, i-0.5)))
                 }
             }
         }
@@ -575,7 +653,7 @@ getSymbolData <- function(ped, pedalign, symbolAttrs) {
     # Values in pos give horizontal position, row number of pos gives vertical
     xpos <- pedalign$pos
     ypos <- matrix(rep(1:nrow(pedalign$nid), ncol(pedalign$nid)),
-            nrow = nrow(pedalign$nid), byrow = FALSE)
+                   nrow = nrow(pedalign$nid), byrow = FALSE)
     # xpos and ypos are matrices corresponding to the 2d layout of the pedigree
     # Extract a vector; subset and order it so xpos, ypos correspond to ped$id
     posSubset <- as.vector(pedalign$nid) != 0
@@ -585,8 +663,9 @@ getSymbolData <- function(ped, pedalign, symbolAttrs) {
     # Sanity check that data elements have same length
     if(length(ped$id) != length(xpos) || length(ped$id) != length(ypos))
         stop("Internal error: xpos and/or ypos do not match ped$id in length")
-    symbolData <- do.call(data.frame, c(list(id = ped$id, x = xpos, y = ypos),
-            symbolAttrs))
+    symbolData <- do.call(data.frame,
+                          c(list(id = ped$id, x = xpos, y = ypos),
+                            symbolAttrs))
     return(symbolData)
 }
 
@@ -599,16 +678,15 @@ getSymbolData <- function(ped, pedalign, symbolAttrs) {
 #'      dataframe to be used as ggplot data for status layer
 getStatusData <- function(ped, symbolData) {
     dead <- ped$id[ped$status == 1]
-    symbolData <- symbolData[
-            symbolData$id %in% dead,
-            c("id", "x", "y", "size", "alpha")]
-    statusData <- data.frame(
-        id    = symbolData$id,
-        x     = symbolData$x - 0.05 * symbolData$size/2 * cos(pi/4),
-        xend  = symbolData$x + 0.05 * symbolData$size/2 * cos(pi/4),
-        y     = symbolData$y + 0.05 * symbolData$size/2 * sin(pi/4),
-        yend  = symbolData$y - 0.05 * symbolData$size/2 * sin(pi/4),
-        alpha = symbolData$alpha)
+    symbolData <- symbolData[symbolData$id %in% dead,
+                             c("id", "x", "y", "size", "alpha")]
+    offset <- 0.06 * symbolData$size/2 * cos(pi/4)
+    statusData <- data.frame(id    = symbolData$id,
+                             x     = symbolData$x - offset,
+                             xend  = symbolData$x + offset,
+                             y     = symbolData$y + offset,
+                             yend  = symbolData$y - offset,
+                             alpha = symbolData$alpha)
     return(statusData)
 }
 
@@ -619,16 +697,17 @@ getStatusData <- function(ped, symbolData) {
 #'      character vector of labels used in addition to ped$id for annotation
 #' @param labelSize
 #'      single numeric value used as size multiplier
+#' @param labelOffset
+#'      single numeric value used to adjust vertical offset of labels
 #' @return
 #'      dataframe to be used as ggplot data for label layer
-getLabelData <- function(symbolData, labelText, labelSize) {
-    labelData <- data.frame(
-        label = as.character(symbolData$id),
-        x     = symbolData$x,
-        y     = symbolData$y,
-        vjust = 1 + 0.15 * symbolData$size,
-        size  = symbolData$size / 2 * labelSize,
-        alpha = symbolData$alpha)
+getLabelData <- function(symbolData, labelText, labelSize, labelOffset) {
+    labelData <- data.frame(label = as.character(symbolData$id),
+                            x     = symbolData$x,
+                            y     = symbolData$y,
+                            vjust = 3.5 - 0.1 * symbolData$size + labelOffset,
+                            size  = symbolData$size / 2 * labelSize,
+                            alpha = symbolData$alpha)
     if(!is.null(labelText))
         labelData$label <- paste(labelData$label, labelText, sep = "\n")
     return(labelData)
