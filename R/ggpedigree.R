@@ -288,16 +288,16 @@ ggpedigree <- function(ped,
                                            * 0.1 * mean(symbolData$size))) + # Scale to symbol size
            scale_shape_identity() +
            switch(ifelse(is.factor(symbolAttrs$fill), 1, 2),
-                  scale_fill_manual(values = attrValues$fill),
+                  scale_fill_manual(values = attrValues$fill, drop = FALSE),
                   scale_fill_gradient(low  = attrValues$fill["low"],
                                       high = attrValues$fill["high"])) +
            switch(ifelse(is.factor(symbolAttrs$border), 1, 2),
-                  scale_color_manual(values = attrValues$border),
+                  scale_color_manual(values = attrValues$border, drop = FALSE),
                   scale_color_gradient(low  = attrValues$border["low"],
                                        high = attrValues$border["high"])) +
-           scale_size_identity(guide = "legend") +
+           scale_size_identity() +
            switch(ifelse(is.factor(symbolAttrs$alpha), 1, 2),
-                  scale_alpha_manual(values = attrValues$alpha),
+                  scale_alpha_manual(values = attrValues$alpha, drop = FALSE),
                   scale_alpha_continuous(range = c(low  = attrValues$alpha["low"],
                                                    high = attrValues$alpha["high"])))
 
